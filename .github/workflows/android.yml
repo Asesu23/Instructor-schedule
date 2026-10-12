@@ -1,0 +1,40 @@
+name: Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  APP_URL: ${{ vars.APP_URL }}
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm install
+      - run: npm run build
+      - run: npx cap add android
+      - run: chmod +x gradlew && ./gradlew assembleDebug
+        working-directory: android
+      - run: mv android/app/build/outputs/apk/debug/app-debug.apk instructor-schedule.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: instructor-schedule.apk
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: instructor-schedule.apk
+          generate_release_notes: true
