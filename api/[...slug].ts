@@ -198,7 +198,7 @@ async function exportAll(): Promise<Result> {
 }
 
 async function route(req: VercelRequest, res: VercelResponse): Promise<Result> {
-  const [resource, id] = ([] as string[]).concat(req.query.slug ?? []);
+  const [resource, id] = ([] as string[]).concat((req.query.slug ?? req.query['...slug'] ?? []) as string | string[]);
   const method = req.method ?? 'GET';
   const body = (req.body ?? {}) as Body;
   if (resource === 'login' && method === 'POST') return login(body, res);
