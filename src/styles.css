@@ -1,0 +1,182 @@
+:root {
+  --bg: #f4f6f8;
+  --fg: #1c2733;
+  --accent: #1f3a5f;
+  --line: #d9e0e7;
+  --muted: #5b6773;
+  --danger: #b3261e;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--fg);
+}
+
+button.on,
+button.add,
+form button[type='submit'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12px;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+nav,
+.tools,
+.daybar,
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.daybar input {
+  flex: 1;
+  min-width: 0;
+}
+
+.stack {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+h1,
+h2 {
+  margin: 12px 0;
+}
+
+h2 {
+  font-size: 1.1rem;
+  text-transform: capitalize;
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.list small,
+.empty {
+  color: var(--muted);
+}
+
+.add {
+  width: 100%;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.login {
+  max-width: 360px;
+  margin: 20vh auto 0;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fdecea;
+  color: var(--danger);
+}
+
+.center {
+  margin-top: 30vh;
+  text-align: center;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  padding: 12px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.modal .card {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.row button {
+  flex: 1;
+}
