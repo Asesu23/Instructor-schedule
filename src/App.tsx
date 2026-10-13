@@ -340,17 +340,32 @@ function LessonForm({
           <span>Начало</span>
           <TimeField value={time} onChange={setTime} />
         </div>
-        <label>
-          Длительность, мин
+        <div className="field">
+          <span>Длительность, мин</span>
           <input
             type="number"
+            inputMode="numeric"
             min={5}
             max={480}
             value={duration}
+            onFocus={(e) => e.target.select()}
             onChange={(e) => setDuration(e.target.value)}
+            aria-label="Длительность, мин"
             required
           />
-        </label>
+          <div className="chips">
+            {[30, 45, 60, 90, 120].map((n) => (
+              <button
+                type="button"
+                key={n}
+                className={Number(duration) === n ? 'on' : ''}
+                onClick={() => setDuration(String(n))}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
         <label>
           Заметка
           <input

@@ -13,6 +13,14 @@ const WEEK = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
 const MINUTE_STEPS = Array.from({ length: 12 }, (_, i) => pad(i * 5));
 
+const formatDay = (day: string) =>
+  parseDay(day).toLocaleDateString('ru-RU', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
 const isTouch = () => !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
 const parseTime = (text: string) => {
@@ -107,7 +115,8 @@ export function DateField({ value, onChange }: { value: string; onChange: (value
 
   if (touch) {
     return (
-      <div className="picker">
+      <div className="picker native">
+        <span className="picker-face">{formatDay(value)}</span>
         <input type="date" value={value} onChange={(e) => e.target.value && onChange(e.target.value)} required />
       </div>
     );
@@ -139,12 +148,7 @@ export function DateField({ value, onChange }: { value: string; onChange: (value
   return (
     <div className="picker" ref={ref}>
       <button type="button" className="picker-btn" onClick={toggle}>
-        {parseDay(value).toLocaleDateString('ru-RU', {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        })}
+        {formatDay(value)}
       </button>
       {open && (
         <Pop anchor={ref}>
@@ -194,7 +198,8 @@ export function TimeField({ value, onChange }: { value: string; onChange: (value
 
   if (touch) {
     return (
-      <div className="picker">
+      <div className="picker native">
+        <span className="picker-face">{value}</span>
         <input type="time" step={60} value={value} onChange={(e) => onChange(e.target.value)} required />
       </div>
     );
