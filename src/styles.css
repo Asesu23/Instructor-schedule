@@ -157,11 +157,6 @@ label,
   color: var(--danger);
 }
 
-.center {
-  margin-top: 30vh;
-  text-align: center;
-}
-
 .modal {
   position: fixed;
   inset: 0;
@@ -294,4 +289,41 @@ label,
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+
+.list li.skeleton {
+  height: 64px;
+  border-color: transparent;
+  background: linear-gradient(90deg, #e6ebf0 25%, #f0f3f6 50%, #e6ebf0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  margin: 30vh auto 0;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list li.skeleton,
+  .spinner {
+    animation: none;
+  }
 }

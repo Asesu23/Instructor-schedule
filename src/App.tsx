@@ -1,9 +1,19 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, type Lesson, type Student } from './api';
 import { shiftDay, toDay, toTime } from './dates';
 import { DateField, TimeField } from './pickers';
 
 const message = (e: unknown) => (e instanceof ApiError ? e.message : 'Нет связи с сервером');
+
+function Skeleton({ rows }: { rows: number }) {
+  return (
+    <ul className="list" aria-busy="true">
+      {Array.from({ length: rows }, (_, i) => (
+        <li key={i} className="skeleton" />
+      ))}
+    </ul>
+  );
+}
 
 export function App() {
   const [auth, setAuth] = useState<'loading' | 'in' | 'out'>('loading');
@@ -15,7 +25,7 @@ export function App() {
     );
   }, []);
 
-  if (auth === 'loading') return <p className="center">Загрузка...</p>;
+  if (auth === 'loading') return <div className="spinner" role="status" aria-label="Загрузка" />;
   if (auth === 'out') return <Login onDone={() => setAuth('in')} />;
   return <Main />;
 }
@@ -55,8 +65,9 @@ function Login({ onDone }: { onDone: () => void }) {
 function Main() {
   const [view, setView] = useState<'day' | 'students'>('day');
   const [day, setDay] = useState(toDay(new Date()));
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
+  const [lessons, setLessons] = useState<{ day: string; items: Lesson[] } | null>(null);
+  const [students, setStudents] = useState<Student[] | null>(null);
+  const dayRef = useRef(day);
   const [editing, setEditing] = useState<Lesson | 'new' | null>(null);
   const [error, setError] = useState('');
 
@@ -64,7 +75,10 @@ function Main() {
     () =>
       api<Student[]>('/students')
         .then(setStudents)
-        .catch((e) => setError(message(e))),
+        .catch((e) => {
+          setError(message(e));
+          setStudents((prev) => prev ?? []);
+        }),
     [],
   );
 
@@ -72,8 +86,17 @@ function Main() {
     const from = new Date(`${day}T00:00`).toISOString();
     const to = new Date(`${shiftDay(day, 1)}T00:00`).toISOString();
     return api<Lesson[]>(`/lessons?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
-      .then(setLessons)
-      .catch((e) => setError(message(e)));
+      .then((items) => {
+        if (dayRef.current === day) setLessons({ day, items });
+      })
+      .catch((e) => {
+        setError(message(e));
+        if (dayRef.current === day) setLessons((prev) => (prev?.day === day ? prev : { day, items: [] }));
+      });
+  }, [day]);
+
+  useEffect(() => {
+    dayRef.current = day;
   }, [day]);
 
   useEffect(() => {
@@ -83,6 +106,8 @@ function Main() {
   useEffect(() => {
     loadLessons();
   }, [loadLessons]);
+
+  const current = lessons?.day === day ? lessons.items : null;
 
   const dayLabel = new Date(`${day}T00:00`).toLocaleDateString('ru-RU', {
     weekday: 'long',
@@ -116,22 +141,26 @@ function Main() {
             <button onClick={() => setDay(toDay(new Date()))}>Сегодня</button>
           </div>
           <h2>{dayLabel}</h2>
-          <ul className="list">
-            {lessons.map((l) => {
-              const start = new Date(l.startAt);
-              const end = new Date(start.getTime() + l.durationMin * 60000);
-              return (
-                <li key={l.id} onClick={() => setEditing(l)}>
-                  <b>
-                    {toTime(start)} - {toTime(end)}
-                  </b>
-                  <span>{l.studentName}</span>
-                  {l.note && <small>{l.note}</small>}
-                </li>
-              );
-            })}
-            {lessons.length === 0 && <li className="empty">Занятий нет</li>}
-          </ul>
+          {current === null ? (
+            <Skeleton rows={3} />
+          ) : (
+            <ul className="list">
+              {current.map((l) => {
+                const start = new Date(l.startAt);
+                const end = new Date(start.getTime() + l.durationMin * 60000);
+                return (
+                  <li key={l.id} onClick={() => setEditing(l)}>
+                    <b>
+                      {toTime(start)} - {toTime(end)}
+                    </b>
+                    <span>{l.studentName}</span>
+                    {l.note && <small>{l.note}</small>}
+                  </li>
+                );
+              })}
+              {current.length === 0 && <li className="empty">Занятий нет</li>}
+            </ul>
+          )}
           <button className="add" onClick={() => setEditing('new')}>
             + Занятие
           </button>
@@ -139,7 +168,7 @@ function Main() {
       ) : (
         <Students students={students} reload={loadStudents} />
       )}
-      {editing && (
+      {editing && students && (
         <LessonForm
           lesson={editing === 'new' ? null : editing}
           day={day}
@@ -258,11 +287,11 @@ function LessonForm({
   );
 }
 
-function Students({ students, reload }: { students: Student[]; reload: () => void }) {
+function Students({ students, reload }: { students: Student[] | null; reload: () => void }) {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Student | 'new' | null>(null);
   const needle = query.trim().toLowerCase();
-  const shown = students.filter((s) => s.name.toLowerCase().includes(needle));
+  const shown = (students ?? []).filter((s) => s.name.toLowerCase().includes(needle));
 
   return (
     <section>
@@ -272,15 +301,19 @@ function Students({ students, reload }: { students: Student[]; reload: () => voi
           + Ученик
         </button>
       </div>
-      <ul className="list">
-        {shown.map((s) => (
-          <li key={s.id} onClick={() => setEditing(s)}>
-            <b>{s.name}</b>
-            {s.note && <small>{s.note}</small>}
-          </li>
-        ))}
-        {shown.length === 0 && <li className="empty">Никого нет</li>}
-      </ul>
+      {students === null ? (
+        <Skeleton rows={4} />
+      ) : (
+        <ul className="list">
+          {shown.map((s) => (
+            <li key={s.id} onClick={() => setEditing(s)}>
+              <b>{s.name}</b>
+              {s.note && <small>{s.note}</small>}
+            </li>
+          ))}
+          {shown.length === 0 && <li className="empty">Никого нет</li>}
+        </ul>
+      )}
       {editing && (
         <StudentForm
           student={editing === 'new' ? null : editing}
