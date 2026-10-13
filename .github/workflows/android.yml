@@ -26,6 +26,7 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: npx cap add android
+      - run: cp -r resources/android/res/. android/app/src/main/res/
       - run: npx cap sync android
       - run: chmod +x gradlew && ./gradlew assembleDebug
         working-directory: android
