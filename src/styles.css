@@ -404,3 +404,7 @@ label,
   border-radius: 18px;
 }
 
+.cal-grid button:disabled:hover {
+  background: transparent;
+}
+

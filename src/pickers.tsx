@@ -105,7 +105,15 @@ function Pop({
   );
 }
 
-export function DateField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function DateField({
+  value,
+  onChange,
+  min,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  min?: string;
+}) {
   const [touch] = useState(isTouch);
   const [month, setMonth] = useState(() => {
     const d = parseDay(value);
@@ -117,7 +125,7 @@ export function DateField({ value, onChange }: { value: string; onChange: (value
     return (
       <div className="picker native">
         <span className="picker-face">{formatDay(value)}</span>
-        <input type="date" value={value} onChange={(e) => e.target.value && onChange(e.target.value)} required />
+        <input type="date" min={min} value={value} onChange={(e) => e.target.value && onChange(e.target.value)} required />
       </div>
     );
   }
@@ -170,7 +178,13 @@ export function DateField({ value, onChange }: { value: string; onChange: (value
               const day = toDay(new Date(year, index, n));
               const classes = [day === value ? 'sel' : '', day === today ? 'today' : ''].join(' ').trim();
               return (
-                <button type="button" key={day} className={classes} onClick={() => pick(day)}>
+                <button
+                  type="button"
+                  key={day}
+                  className={classes}
+                  disabled={min !== undefined && day < min}
+                  onClick={() => pick(day)}
+                >
                   {n}
                 </button>
               );

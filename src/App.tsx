@@ -116,6 +116,8 @@ function Main() {
     loadLessons();
   }, [loadLessons]);
 
+  const today = toDay(new Date(now));
+
   const current = lessons?.day === day ? lessons.items.filter((l) => endOf(l) > now) : null;
 
   const dayLabel = new Date(`${day}T00:00`).toLocaleDateString('ru-RU', {
@@ -147,8 +149,10 @@ function Main() {
       {view === 'day' ? (
         <section>
           <div className="daybar">
-            <button onClick={() => setDay(shiftDay(day, -1))}>‹</button>
-            <DateField value={day} onChange={setDay} />
+            <button disabled={day <= today} onClick={() => setDay(shiftDay(day, -1))}>
+              ‹
+            </button>
+            <DateField value={day} min={today} onChange={(d) => setDay(d < today ? today : d)} />
             <button onClick={() => setDay(shiftDay(day, 1))}>›</button>
             <button onClick={() => setDay(toDay(new Date()))}>Сегодня</button>
           </div>
