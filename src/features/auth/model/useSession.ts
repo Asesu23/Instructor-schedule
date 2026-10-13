@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ApiError } from '@/shared/api';
 import { authApi } from '../api/authApi';
 
 export function useSession() {
@@ -7,7 +8,7 @@ export function useSession() {
   useEffect(() => {
     authApi.session().then(
       () => setStatus('in'),
-      () => setStatus('out'),
+      (error) => setStatus(error instanceof ApiError && error.status === 401 ? 'out' : 'in'),
     );
   }, []);
 

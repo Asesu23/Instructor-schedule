@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { shiftDay, useQueryError } from '@/shared/lib';
+import { shiftDay, useQueryError, useStaleData } from '@/shared/lib';
 import { lessonApi } from '../api/lessonApi';
 import { lessonKeys } from './keys';
 
@@ -13,6 +13,7 @@ export function useDayLessons(day: string) {
     },
   });
   const { error, dismissError } = useQueryError(query);
+  const stale = useStaleData(query);
 
-  return { items: query.data ?? (query.isError ? [] : null), error, dismissError };
+  return { items: query.data ?? (query.isError ? [] : null), error, dismissError, stale };
 }

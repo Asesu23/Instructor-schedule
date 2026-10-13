@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useQueryError } from '@/shared/lib';
+import { useQueryError, useStaleData } from '@/shared/lib';
 import { lessonApi } from '../api/lessonApi';
 import { lessonEnd } from '../lib/time';
 import { lessonKeys } from './keys';
@@ -15,6 +15,7 @@ export function useLessonHistory() {
     },
   });
   const { error, dismissError } = useQueryError(query);
+  const stale = useStaleData(query);
 
-  return { items: query.data ?? (query.isError ? [] : null), error, dismissError };
+  return { items: query.data ?? (query.isError ? [] : null), error, dismissError, stale };
 }

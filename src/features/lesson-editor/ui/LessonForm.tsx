@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import type { Lesson } from '@/entities/lesson';
 import { StudentPicker, type Student } from '@/entities/student';
-import { errorMessage, toDay, toTime } from '@/shared/lib';
+import { errorMessage, toDay, toTime, useOnline } from '@/shared/lib';
 import { DateField, FormModal, TimeField } from '@/shared/ui';
 import { useDeleteLesson, useSaveLesson } from '../model/useLessonMutations';
 
@@ -28,7 +28,9 @@ export function LessonForm({
   const [note, setNote] = useState(lesson?.note ?? '');
   const saveLesson = useSaveLesson();
   const deleteLesson = useDeleteLesson();
+  const online = useOnline();
   const pending = saveLesson.isPending || deleteLesson.isPending;
+  const blocked = pending || !online;
   const error = saveLesson.error ?? deleteLesson.error;
 
   const save = (e: FormEvent) => {
@@ -95,13 +97,14 @@ export function LessonForm({
         Заметка
         <input value={note} maxLength={500} placeholder="Заметка" onChange={(e) => setNote(e.target.value)} />
       </label>
+      {!online && <p className="error">Нет связи</p>}
       {error && <p className="error">{errorMessage(error)}</p>}
       <div className="row">
-        <button type="submit" disabled={pending || students.length === 0 || !studentId}>
+        <button type="submit" disabled={blocked || students.length === 0 || !studentId}>
           Сохранить
         </button>
         {lesson && (
-          <button type="button" className="danger" disabled={pending} onClick={remove}>
+          <button type="button" className="danger" disabled={blocked} onClick={remove}>
             Удалить
           </button>
         )}

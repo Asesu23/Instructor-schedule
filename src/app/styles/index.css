@@ -160,6 +160,14 @@ label,
   color: var(--danger);
 }
 
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff4d6;
+  color: #6b4e00;
+}
+
 .modal {
   position: fixed;
   inset: 0;
@@ -407,4 +415,3 @@ label,
 .cal-grid button:disabled:hover {
   background: transparent;
 }
-

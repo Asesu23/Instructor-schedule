@@ -60,6 +60,11 @@ With the Vercel and Neon integration enabled, every preview deployment gets its 
 
 A preview branch starts as a copy of its parent branch, so it contains the parent's data. Point the integration at a parent branch that holds only test data if the production database contains real student names.
 
+## Offline reading
+Lessons and students are cached in IndexedDB, so the last loaded data stays readable without a connection, including after a restart. Only successful lesson and student queries are stored, for at most three days, and the cache is versioned with a buster string (`CACHE_MAX_AGE_MS` and `CACHE_BUSTER` in `src/app/providers/persistence.ts`). It is wiped when the app lands on the login screen, because it contains student names.
+
+The app is read-only while offline. There is no write queue: adding, editing and deleting are disabled and the UI says "Нет связи" until the connection returns. When data is shown from the cache because a refresh failed, a short banner warns that it may be outdated. The service worker only caches the app shell and never API responses.
+
 ## Mobile app
 The phone app is a Capacitor shell that loads the deployed web app, so there is a single codebase and web changes reach the app on the next Vercel deploy without rebuilding it. Sessions use the same cookie as in the browser.
 

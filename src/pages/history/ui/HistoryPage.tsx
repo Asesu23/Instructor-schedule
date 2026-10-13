@@ -3,15 +3,16 @@ import { LessonItem, groupByDay, useLessonHistory, type Lesson } from '@/entitie
 import type { Student } from '@/entities/student';
 import { LessonForm } from '@/features/lesson-editor';
 import { toDay } from '@/shared/lib';
-import { ErrorBanner, Skeleton } from '@/shared/ui';
+import { ErrorBanner, Skeleton, StaleBanner } from '@/shared/ui';
 
 export function HistoryPage({ students }: { students: Student[] | null }) {
   const [editing, setEditing] = useState<Lesson | null>(null);
-  const { items, error, dismissError } = useLessonHistory();
+  const { items, error, dismissError, stale } = useLessonHistory();
 
   return (
     <section>
       <ErrorBanner message={error} onDismiss={dismissError} />
+      <StaleBanner visible={stale} />
       {items === null ? (
         <Skeleton rows={4} />
       ) : items.length === 0 ? (

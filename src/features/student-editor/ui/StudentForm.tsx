@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import type { Student } from '@/entities/student';
-import { errorMessage } from '@/shared/lib';
+import { errorMessage, useOnline } from '@/shared/lib';
 import { FormModal } from '@/shared/ui';
 import { useDeleteStudent, useSaveStudent } from '../model/useStudentMutations';
 
@@ -17,7 +17,9 @@ export function StudentForm({
   const [note, setNote] = useState(student?.note ?? '');
   const saveStudent = useSaveStudent();
   const deleteStudent = useDeleteStudent();
+  const online = useOnline();
   const pending = saveStudent.isPending || deleteStudent.isPending;
+  const blocked = pending || !online;
   const error = saveStudent.error ?? deleteStudent.error;
 
   const save = (e: FormEvent) => {
@@ -49,13 +51,14 @@ export function StudentForm({
         Заметка
         <input value={note} maxLength={500} placeholder="Заметка" onChange={(e) => setNote(e.target.value)} />
       </label>
+      {!online && <p className="error">Нет связи</p>}
       {error && <p className="error">{errorMessage(error)}</p>}
       <div className="row">
-        <button type="submit" disabled={pending}>
+        <button type="submit" disabled={blocked}>
           Сохранить
         </button>
         {student && (
-          <button type="button" className="danger" disabled={pending} onClick={remove}>
+          <button type="button" className="danger" disabled={blocked} onClick={remove}>
             Удалить
           </button>
         )}
