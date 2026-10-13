@@ -13,6 +13,18 @@ A small mobile-first PWA for a single driving instructor: keep a list of student
 ## Stack
 React 19, Vite, TypeScript, Vercel Functions, Neon Postgres, Capacitor.
 
+## Architecture
+The frontend follows [Feature-Sliced Design](https://feature-sliced.design/). `@/` is an alias for `src/`, layers import only from the layers below them, and every slice exposes its public API through an `index.ts`.
+
+    src/
+      app/        entry point, auth gate, app shell, global styles
+      pages/      schedule, students, history, login
+      features/   auth, lesson-editor, student-editor
+      entities/   lesson, student (types, API client, data hooks, list items)
+      shared/     fetch client, date helpers, UI kit (modal, date and time pickers)
+
+The backend is a single Vercel Function entry (`api/[...slug].ts`) that delegates to `server/`: a router, session auth, input validation and one handler module per resource. Local imports in `server/` use explicit `.js` extensions because the project is an ES module.
+
 ## Setup
 1. Create a Neon Postgres database (via the Vercel Marketplace or neon.com) and run `db/schema.sql` in its SQL editor.
 2. Generate the password hash: `npm run hash -- "a long password"`.

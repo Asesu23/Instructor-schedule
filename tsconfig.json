@@ -10,7 +10,8 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src", "api", "vite.config.ts"]
+  "include": ["src", "api", "server", "vite.config.ts"]
 }
