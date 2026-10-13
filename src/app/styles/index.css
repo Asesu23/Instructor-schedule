@@ -1,13 +1,44 @@
 :root {
+  color-scheme: light;
   --bg: #f4f6f8;
   --fg: #1c2733;
+  --surface: #fff;
+  --hover: #f4f6f8;
   --accent: #1f3a5f;
+  --on-accent: #fff;
   --line: #d9e0e7;
   --muted: #5b6773;
   --danger: #b3261e;
+  --danger-bg: #fdecea;
+  --notice-fg: #6b4e00;
+  --notice-bg: #fff4d6;
+  --overlay: rgba(0, 0, 0, 0.4);
+  --shadow: rgba(0, 0, 0, 0.15);
+  --skeleton-a: #e6ebf0;
+  --skeleton-b: #f0f3f6;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color: var(--fg);
   background: var(--bg);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #121a22;
+  --fg: #e6ebf0;
+  --surface: #1c2733;
+  --hover: #263543;
+  --accent: #8fb4e8;
+  --on-accent: #0e1b2c;
+  --line: #334556;
+  --muted: #9aa8b6;
+  --danger: #f2918a;
+  --danger-bg: #3b2224;
+  --notice-fg: #f1d68a;
+  --notice-bg: #382f14;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --skeleton-a: #1c2733;
+  --skeleton-b: #27384a;
 }
 
 * {
@@ -30,7 +61,7 @@ button {
   padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--fg);
 }
 
@@ -39,7 +70,7 @@ button.add,
 form button[type='submit'] {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 button.danger {
@@ -58,7 +89,8 @@ select {
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
+  color: var(--fg);
 }
 
 .app {
@@ -69,9 +101,18 @@ select {
 
 header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  margin-left: auto;
+  padding: 0;
 }
 
 nav,
@@ -120,7 +161,7 @@ h2.day {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .list small,
@@ -137,7 +178,7 @@ h2.day {
   gap: 12px;
   padding: 16px;
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .login {
@@ -156,7 +197,7 @@ label,
   margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #fdecea;
+  background: var(--danger-bg);
   color: var(--danger);
 }
 
@@ -164,8 +205,8 @@ label,
   margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #fff4d6;
-  color: #6b4e00;
+  background: var(--notice-bg);
+  color: var(--notice-fg);
 }
 
 .modal {
@@ -175,7 +216,7 @@ label,
   align-items: end;
   padding: 12px;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay);
 }
 
 .modal .card {
@@ -206,8 +247,8 @@ label,
   overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  background: var(--surface);
+  box-shadow: 0 8px 24px var(--shadow);
 }
 
 .cal-head {
@@ -249,7 +290,7 @@ label,
 }
 
 .cal-grid button:hover {
-  background: var(--bg);
+  background: var(--hover);
 }
 
 .cal-grid button.today {
@@ -258,7 +299,7 @@ label,
 
 .cal-grid button.sel {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .cal-foot {
@@ -293,19 +334,19 @@ label,
 }
 
 .time-grid button:hover {
-  background: var(--bg);
+  background: var(--hover);
 }
 
 .time-grid button.sel {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .list li.skeleton {
   height: 64px;
   border-color: transparent;
-  background: linear-gradient(90deg, #e6ebf0 25%, #f0f3f6 50%, #e6ebf0 75%);
+  background: linear-gradient(90deg, var(--skeleton-a) 25%, var(--skeleton-b) 50%, var(--skeleton-a) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.2s linear infinite;
 }
@@ -347,7 +388,7 @@ label,
   list-style: none;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .combo-list li {
@@ -359,7 +400,7 @@ label,
 }
 
 .combo-list li.active {
-  background: var(--bg);
+  background: var(--hover);
 }
 
 .combo-list li.sel {
@@ -386,7 +427,7 @@ label,
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .picker.native input {

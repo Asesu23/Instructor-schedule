@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useStudents } from '@/entities/student';
+import { ThemeToggle } from '@/features/theme-toggle';
 import { HistoryPage } from '@/pages/history';
 import { SchedulePage } from '@/pages/schedule';
 import { StudentsPage } from '@/pages/students';
-import { ErrorBanner, StaleBanner, SyncFailures, SyncStatus } from '@/shared/ui';
+import { useOnline } from '@/shared/lib';
+import { ErrorBanner, StaleBanner } from '@/shared/ui';
 
 type View = 'day' | 'students' | 'history';
 
@@ -16,6 +18,7 @@ const TABS: { id: View; label: string }[] = [
 export function AppShell() {
   const [view, setView] = useState<View>('day');
   const { students, error, dismissError, stale } = useStudents();
+  const online = useOnline();
 
   return (
     <div className="app">
@@ -27,9 +30,9 @@ export function AppShell() {
             </button>
           ))}
         </nav>
+        <ThemeToggle />
       </header>
-      <SyncStatus />
-      <SyncFailures />
+      {!online && <p className="error">Нет связи</p>}
       <ErrorBanner message={error} onDismiss={dismissError} />
       {view === 'students' && <StaleBanner visible={stale} />}
       {view === 'day' && <SchedulePage students={students} />}
