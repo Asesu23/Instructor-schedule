@@ -17,7 +17,7 @@ export function App() {
 
   if (auth === 'loading') return <p className="center">Загрузка...</p>;
   if (auth === 'out') return <Login onDone={() => setAuth('in')} />;
-  return <Main onLogout={() => setAuth('out')} />;
+  return <Main />;
 }
 
 function Login({ onDone }: { onDone: () => void }) {
@@ -52,7 +52,7 @@ function Login({ onDone }: { onDone: () => void }) {
   );
 }
 
-function Main({ onLogout }: { onLogout: () => void }) {
+function Main() {
   const [view, setView] = useState<'day' | 'students'>('day');
   const [day, setDay] = useState(toDay(new Date()));
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -84,21 +84,6 @@ function Main({ onLogout }: { onLogout: () => void }) {
     loadLessons();
   }, [loadLessons]);
 
-  const logout = async () => {
-    await api('/logout', 'POST').catch(() => undefined);
-    onLogout();
-  };
-
-  const exportData = async () => {
-    const data = await api('/export');
-    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `backup-${toDay(new Date())}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   const dayLabel = new Date(`${day}T00:00`).toLocaleDateString('ru-RU', {
     weekday: 'long',
     day: 'numeric',
@@ -116,10 +101,6 @@ function Main({ onLogout }: { onLogout: () => void }) {
             Ученики
           </button>
         </nav>
-        <div className="tools">
-          <button onClick={() => exportData().catch((e) => setError(message(e)))}>Экспорт</button>
-          <button onClick={logout}>Выход</button>
-        </div>
       </header>
       {error && (
         <p className="error" onClick={() => setError('')}>

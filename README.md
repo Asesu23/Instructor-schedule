@@ -6,7 +6,7 @@ A small mobile-first PWA for a single driving instructor: keep a list of student
 - Password login for one user, no registration
 - Students (first name or nickname plus a short note) with search
 - Lessons with minute-precision start and duration in minutes; overlaps are rejected by a Postgres exclusion constraint
-- Day view in the device time zone, JSON export for backups
+- Day view in the device time zone
 - Installable PWA
 - Android and iOS app via a Capacitor shell around the same web app
 
