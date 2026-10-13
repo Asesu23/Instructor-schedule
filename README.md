@@ -28,10 +28,10 @@ Server state is handled by TanStack Query. Each entity owns its query key factor
 The backend is a single Vercel Function entry (`api/[...slug].ts`) that delegates to `server/`: a router, session auth, input validation and one handler module per resource. Local imports in `server/` use explicit `.js` extensions because the project is an ES module.
 
 ## Setup
-1. Create a Neon Postgres database (via the Vercel Marketplace or neon.com) and run `db/schema.sql` in its SQL editor.
+1. Create a Neon Postgres database (via the Vercel Marketplace or neon.com). The schema is applied by the migration runner, see [Database migrations](#database-migrations).
 2. Generate the password hash: `npm run hash -- "a long password"`.
 3. Set `DATABASE_URL`, `SESSION_SECRET` (random 32+ bytes) and `PASSWORD_HASH` in the Vercel project settings, see `.env.example`.
-4. Deploy the repository to Vercel.
+4. Deploy the repository to Vercel. The build applies pending migrations before building the app.
 
 ## Local development
     npm install
@@ -39,6 +39,26 @@ The backend is a single Vercel Function entry (`api/[...slug].ts`) that delegate
     npm run dev
 
 `npm run dev` starts `vercel dev`, which serves the web app and the API together and needs the Vercel CLI linked to a project.
+
+## Database migrations
+The schema lives in plain SQL files in `db/migrations/`, named `0001_init.sql`, `0002_*.sql` and so on. `scripts/migrate.mjs` is a small runner built on `@neondatabase/serverless`:
+
+- it creates a `schema_migrations` table and records the name of every applied file
+- pending files are applied in filename order, and each file runs in one transaction together with its `schema_migrations` row, so a failed migration leaves nothing half applied
+- running it again does nothing when the database is up to date
+
+Apply migrations manually against any database:
+
+    DATABASE_URL="postgres://..." npm run db:migrate
+
+Add a schema change as a new numbered file, never by editing a file that has already been applied. The initial migration uses `if not exists`, so it is safe to run against a database that was created from the earlier single `schema.sql`.
+
+On Vercel the `vercel-build` script runs `npm run db:migrate` and then `npm run build`. The plain `build` script does not touch the database, so it can run where `DATABASE_URL` is not available, for example in the Android APK workflow.
+
+## Preview deployments
+With the Vercel and Neon integration enabled, every preview deployment gets its own copy-on-write Neon branch. Neon creates the branch, Vercel injects its connection string as `DATABASE_URL` for that deployment, and `vercel-build` applies the migrations to it. A pull request that adds a migration is therefore tested against an isolated database and never touches production data. The `SESSION_SECRET` and `PASSWORD_HASH` variables are not provided by the integration and must be set for the Preview environment in the Vercel project settings.
+
+A preview branch starts as a copy of its parent branch, so it contains the parent's data. Point the integration at a parent branch that holds only test data if the production database contains real student names.
 
 ## Mobile app
 The phone app is a Capacitor shell that loads the deployed web app, so there is a single codebase and web changes reach the app on the next Vercel deploy without rebuilding it. Sessions use the same cookie as in the browser.
