@@ -151,7 +151,7 @@ function Main() {
             <button onClick={() => setDay(shiftDay(day, 1))}>›</button>
             <button onClick={() => setDay(toDay(new Date()))}>Сегодня</button>
           </div>
-          <h2>{dayLabel}</h2>
+          <h2 className="day">{dayLabel}</h2>
           {current === null ? (
             <Skeleton rows={3} />
           ) : (
@@ -239,7 +239,7 @@ function History({ students }: { students: Student[] | null }) {
       ) : (
         [...groups].map(([key, list]) => (
           <div key={key}>
-            <h2>
+            <h2 className="day">
               {new Date(`${key}T00:00`).toLocaleDateString('ru-RU', {
                 weekday: 'long',
                 day: 'numeric',
@@ -361,7 +361,7 @@ function LessonForm({
           <input
             value={note}
             maxLength={500}
-            placeholder="Без фамилий, телефонов и адресов"
+            placeholder="Заметка"
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
@@ -458,11 +458,11 @@ function StudentForm({
       <form className="card" onClick={(e) => e.stopPropagation()} onSubmit={save}>
         <h2>{student ? 'Ученик' : 'Новый ученик'}</h2>
         <label>
-          Имя или ник
+          Имя и фамилия
           <input
             value={name}
             maxLength={100}
-            placeholder="Без фамилии"
+            placeholder="Иван Иванов"
             onChange={(e) => setName(e.target.value)}
             required
           />
@@ -472,7 +472,7 @@ function StudentForm({
           <input
             value={note}
             maxLength={500}
-            placeholder="Без телефонов и адресов"
+            placeholder="Заметка"
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
