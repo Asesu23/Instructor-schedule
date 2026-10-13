@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { parseDay, toDay } from '@/shared/lib';
-import { isTouch } from './device';
 import { Pop, useDismiss } from './popover';
 
 const WEEK = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -22,21 +21,11 @@ export function DateField({
   onChange: (value: string) => void;
   min?: string;
 }) {
-  const [touch] = useState(isTouch);
   const [month, setMonth] = useState(() => {
     const d = parseDay(value);
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
   const { open, setOpen, ref } = useDismiss();
-
-  if (touch) {
-    return (
-      <div className="picker native">
-        <span className="picker-face">{formatDay(value)}</span>
-        <input type="date" min={min} value={value} onChange={(e) => e.target.value && onChange(e.target.value)} required />
-      </div>
-    );
-  }
 
   const year = month.getFullYear();
   const index = month.getMonth();

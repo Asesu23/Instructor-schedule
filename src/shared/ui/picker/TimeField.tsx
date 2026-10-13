@@ -24,15 +24,6 @@ export function TimeField({ value, onChange }: { value: string; onChange: (value
     setDraft(value);
   }, [value]);
 
-  if (touch) {
-    return (
-      <div className="picker native">
-        <span className="picker-face">{value}</span>
-        <input type="time" step={60} value={value} onChange={(e) => onChange(e.target.value)} required />
-      </div>
-    );
-  }
-
   const [hour = '00', minute = '00'] = value.split(':');
 
   const commit = () => {
@@ -49,13 +40,14 @@ export function TimeField({ value, onChange }: { value: string; onChange: (value
     <div className="picker" ref={ref}>
       <input
         value={draft}
-        inputMode="numeric"
+        inputMode={touch ? 'none' : 'numeric'}
+        readOnly={touch}
         placeholder="ЧЧ:ММ"
         maxLength={5}
         autoComplete="off"
         onFocus={(e) => {
           setOpen(true);
-          e.target.select();
+          if (!touch) e.target.select();
         }}
         onClick={() => setOpen(true)}
         onChange={(e) => setDraft(e.target.value)}
