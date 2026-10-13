@@ -82,7 +82,8 @@ nav,
   gap: 8px;
 }
 
-.daybar input {
+.daybar input,
+.daybar .picker {
   flex: 1;
   min-width: 0;
 }
@@ -142,7 +143,8 @@ h2 {
   margin: 20vh auto 0;
 }
 
-label {
+label,
+.field {
   display: grid;
   gap: 4px;
   font-size: 0.9rem;
@@ -179,4 +181,98 @@ label {
 
 .row button {
   flex: 1;
+}
+
+.picker {
+  position: relative;
+}
+
+.picker-btn {
+  width: 100%;
+  text-align: left;
+}
+
+.pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cal-head b {
+  text-transform: capitalize;
+}
+
+.cal-head button {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.cal-grid span {
+  padding: 4px 0;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.cal-grid button {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.cal-grid button:hover {
+  background: var(--bg);
+}
+
+.cal-grid button.today {
+  border: 1px solid var(--accent);
+}
+
+.cal-grid button.sel {
+  background: var(--accent);
+  color: #fff;
+}
+
+.cal-foot {
+  margin-top: 8px;
+}
+
+.cal-foot button {
+  width: 100%;
+  min-height: 36px;
+}
+
+.time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time select {
+  flex: 1;
+  min-width: 0;
 }

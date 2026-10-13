@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError, type Lesson, type Student } from './api';
+import { shiftDay, toDay, toTime } from './dates';
+import { DateField, TimeField } from './pickers';
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const toDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const toTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-const shiftDay = (day: string, delta: number) => {
-  const d = new Date(`${day}T00:00`);
-  d.setDate(d.getDate() + delta);
-  return toDay(d);
-};
 const message = (e: unknown) => (e instanceof ApiError ? e.message : 'Нет связи с сервером');
 
 export function App() {
@@ -136,7 +130,7 @@ function Main({ onLogout }: { onLogout: () => void }) {
         <section>
           <div className="daybar">
             <button onClick={() => setDay(shiftDay(day, -1))}>‹</button>
-            <input type="date" value={day} onChange={(e) => e.target.value && setDay(e.target.value)} />
+            <DateField value={day} onChange={setDay} />
             <button onClick={() => setDay(shiftDay(day, 1))}>›</button>
             <button onClick={() => setDay(toDay(new Date()))}>Сегодня</button>
           </div>
@@ -236,14 +230,14 @@ function LessonForm({
             ))}
           </select>
         </label>
-        <label>
-          Дата
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-        </label>
-        <label>
-          Начало
-          <input type="time" step={60} value={time} onChange={(e) => setTime(e.target.value)} required />
-        </label>
+        <div className="field">
+          <span>Дата</span>
+          <DateField value={date} onChange={setDate} />
+        </div>
+        <div className="field">
+          <span>Начало</span>
+          <TimeField value={time} onChange={setTime} />
+        </div>
         <label>
           Длительность, мин
           <input
