@@ -320,7 +320,7 @@ function LessonForm({
       durationMin: Number(duration),
       note,
     };
-    run(() => (lesson ? api(`/lessons/${lesson.id}`, 'PUT', body) : api('/lessons', 'POST', body)));
+    run(() => (lesson ? api(`/lessons?id=${lesson.id}`, 'PUT', body) : api('/lessons', 'POST', body)));
   };
 
   return (
@@ -366,7 +366,7 @@ function LessonForm({
             Сохранить
           </button>
           {lesson && (
-            <button type="button" className="danger" onClick={() => run(() => api(`/lessons/${lesson.id}`, 'DELETE'))}>
+            <button type="button" className="danger" onClick={() => run(() => api(`/lessons?id=${lesson.id}`, 'DELETE'))}>
               Удалить
             </button>
           )}
@@ -445,7 +445,7 @@ function StudentForm({
   const save = (e: FormEvent) => {
     e.preventDefault();
     const body = { name, note };
-    run(() => (student ? api(`/students/${student.id}`, 'PUT', body) : api('/students', 'POST', body)));
+    run(() => (student ? api(`/students?id=${student.id}`, 'PUT', body) : api('/students', 'POST', body)));
   };
 
   return (
@@ -475,7 +475,7 @@ function StudentForm({
         <div className="row">
           <button type="submit">Сохранить</button>
           {student && (
-            <button type="button" className="danger" onClick={() => run(() => api(`/students/${student.id}`, 'DELETE'))}>
+            <button type="button" className="danger" onClick={() => run(() => api(`/students?id=${student.id}`, 'DELETE'))}>
               Удалить
             </button>
           )}
