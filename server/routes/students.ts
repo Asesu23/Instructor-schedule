@@ -1,6 +1,6 @@
 import { sql } from '../db.js';
 import { HttpError, pgCode, type Body, type Result } from '../http.js';
-import { parseText, requireId } from '../validation.js';
+import { parseOptionalId, parseText, requireId } from '../validation.js';
 
 export async function handleStudents(method: string, rawId: string | undefined, body: Body): Promise<Result> {
   if (!rawId && method === 'GET') {
@@ -9,8 +9,15 @@ export async function handleStudents(method: string, rawId: string | undefined, 
   if (!rawId && method === 'POST') {
     const name = parseText(body.name, 'Имя', 100, true);
     const note = parseText(body.note, 'Заметка', 500, false);
-    const rows = await sql`insert into students (name, note) values (${name}, ${note}) returning id, name, note`;
-    return { status: 201, body: rows[0] };
+    const id = parseOptionalId(body.id);
+    const rows = await sql`
+      insert into students (id, name, note)
+      values (coalesce(${id}::uuid, gen_random_uuid()), ${name}, ${note})
+      on conflict (id) do nothing
+      returning id, name, note`;
+    if (rows.length > 0) return { status: 201, body: rows[0] };
+    const existing = await sql`select id, name, note from students where id = ${id}::uuid`;
+    return { status: 200, body: existing[0] };
   }
   const id = requireId(rawId);
   if (method === 'PUT') {

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { errorMessage } from './errors';
+import { errorMessage, isConnectionError } from './errors';
 
-export function useQueryError(query: { error: unknown; errorUpdatedAt: number }) {
+export function useQueryError(query: { data: unknown; error: unknown; errorUpdatedAt: number }) {
   const [dismissedAt, setDismissedAt] = useState(0);
-  const error = query.error && query.errorUpdatedAt > dismissedAt ? errorMessage(query.error) : '';
+  const hasCachedData = query.data !== undefined && isConnectionError(query.error);
+  const error = query.error && !hasCachedData && query.errorUpdatedAt > dismissedAt ? errorMessage(query.error) : '';
 
   return { error, dismissError: () => setDismissedAt(query.errorUpdatedAt) };
 }

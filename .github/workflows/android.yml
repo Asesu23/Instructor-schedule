@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  APP_URL: ${{ vars.APP_URL }}
+  VITE_API_URL: ${{ vars.APP_URL }}
 
 jobs:
   apk:
@@ -26,6 +26,7 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: npx cap add android
+      - run: npx cap sync android
       - run: chmod +x gradlew && ./gradlew assembleDebug
         working-directory: android
       - run: mv android/app/build/outputs/apk/debug/app-debug.apk instructor-schedule.apk

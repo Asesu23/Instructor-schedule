@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
+import { useLessonCache } from '@/entities/lesson';
 import type { Student } from '@/entities/student';
-import { errorMessage, useOnline } from '@/shared/lib';
+import { newId } from '@/shared/lib';
 import { FormModal } from '@/shared/ui';
 import { useDeleteStudent, useSaveStudent } from '../model/useStudentMutations';
 
@@ -15,23 +16,25 @@ export function StudentForm({
 }) {
   const [name, setName] = useState(student?.name ?? '');
   const [note, setNote] = useState(student?.note ?? '');
+  const [error, setError] = useState('');
   const saveStudent = useSaveStudent();
   const deleteStudent = useDeleteStudent();
-  const online = useOnline();
-  const pending = saveStudent.isPending || deleteStudent.isPending;
-  const blocked = pending || !online;
-  const error = saveStudent.error ?? deleteStudent.error;
+  const cache = useLessonCache();
 
   const save = (e: FormEvent) => {
     e.preventDefault();
-    deleteStudent.reset();
-    saveStudent.mutate({ id: student?.id ?? null, body: { name, note } }, { onSuccess: onSaved });
+    saveStudent.mutate({ id: student?.id ?? newId(), isNew: !student, body: { name, note } });
+    onSaved();
   };
 
   const remove = () => {
     if (!student) return;
-    saveStudent.reset();
-    deleteStudent.mutate(student.id, { onSuccess: onSaved });
+    if (cache.hasLessonsFor(student.id)) {
+      setError('У ученика есть занятия');
+      return;
+    }
+    deleteStudent.mutate(student.id);
+    onSaved();
   };
 
   return (
@@ -51,18 +54,17 @@ export function StudentForm({
         Заметка
         <input value={note} maxLength={500} placeholder="Заметка" onChange={(e) => setNote(e.target.value)} />
       </label>
-      {!online && <p className="error">Нет связи</p>}
-      {error && <p className="error">{errorMessage(error)}</p>}
+      {error && <p className="error">{error}</p>}
       <div className="row">
-        <button type="submit" disabled={blocked}>
+        <button type="submit">
           Сохранить
         </button>
         {student && (
-          <button type="button" className="danger" disabled={blocked} onClick={remove}>
+          <button type="button" className="danger" onClick={remove}>
             Удалить
           </button>
         )}
-        <button type="button" disabled={pending} onClick={onClose}>
+        <button type="button" onClick={onClose}>
           Отмена
         </button>
       </div>

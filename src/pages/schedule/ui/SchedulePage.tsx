@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { LessonItem, lessonEnd, useDayLessons, type Lesson } from '@/entities/lesson';
 import type { Student } from '@/entities/student';
 import { LessonForm } from '@/features/lesson-editor';
-import { shiftDay, toDay, useNow, useOnline } from '@/shared/lib';
+import { shiftDay, toDay, useNow } from '@/shared/lib';
 import { DateField, ErrorBanner, Skeleton, StaleBanner } from '@/shared/ui';
 
 export function SchedulePage({ students }: { students: Student[] | null }) {
@@ -11,7 +11,6 @@ export function SchedulePage({ students }: { students: Student[] | null }) {
   const [day, setDay] = useState(today);
   const [editing, setEditing] = useState<Lesson | 'new' | null>(null);
   const { items, error, dismissError, stale } = useDayLessons(day);
-  const online = useOnline();
 
   const upcoming = items?.filter((l) => lessonEnd(l) > now) ?? null;
 
@@ -44,7 +43,7 @@ export function SchedulePage({ students }: { students: Student[] | null }) {
           {upcoming.length === 0 && <li className="empty">Занятий нет</li>}
         </ul>
       )}
-      <button className="add" disabled={!online} onClick={() => setEditing('new')}>
+      <button className="add" onClick={() => setEditing('new')}>
         + Занятие
       </button>
       {editing && students && (

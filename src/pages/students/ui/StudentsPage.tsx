@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { StudentItem, type Student } from '@/entities/student';
 import { StudentForm } from '@/features/student-editor';
-import { useOnline } from '@/shared/lib';
 import { Skeleton } from '@/shared/ui';
 
 export function StudentsPage({ students }: { students: Student[] | null }) {
-  const online = useOnline();
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Student | 'new' | null>(null);
   const needle = query.trim().toLowerCase();
@@ -15,7 +13,7 @@ export function StudentsPage({ students }: { students: Student[] | null }) {
     <section>
       <div className="stack">
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск по имени" />
-        <button className="add" disabled={!online} onClick={() => setEditing('new')}>
+        <button className="add" onClick={() => setEditing('new')}>
           + Ученик
         </button>
       </div>

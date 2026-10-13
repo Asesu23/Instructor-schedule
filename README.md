@@ -7,11 +7,12 @@ A small mobile-first PWA for a single driving instructor: keep a list of student
 - Students (first name or nickname plus a short note) with search
 - Lessons with minute-precision start and duration in minutes; overlaps are rejected by a Postgres exclusion constraint
 - Day view in the device time zone
-- Installable PWA
-- Android and iOS app via a Capacitor shell around the same web app
+- Works fully offline: reads and writes are stored locally and synced when the connection returns
+- Installable PWA with a precached app shell
+- Android and iOS app that bundles the web build inside the binary (Capacitor)
 
 ## Stack
-React 19, Vite, TypeScript, TanStack Query, Vercel Functions, Neon Postgres, Capacitor.
+React 19, Vite, TypeScript, TanStack Query, IndexedDB (idb-keyval), Vercel Functions, Neon Postgres, Capacitor, Workbox (vite-plugin-pwa).
 
 ## Architecture
 The frontend follows [Feature-Sliced Design](https://feature-sliced.design/). `@/` is an alias for `src/`, layers import only from the layers below them, and every slice exposes its public API through an `index.ts`.
@@ -23,7 +24,7 @@ The frontend follows [Feature-Sliced Design](https://feature-sliced.design/). `@
       entities/   lesson, student (types, API client, query keys, data hooks, list items)
       shared/     fetch client, date helpers, UI kit (modal, date and time pickers)
 
-Server state is handled by TanStack Query. Each entity owns its query key factory and read hooks, and the editor features own the mutations. Deleting a lesson is optimistic and rolls back on failure, while creating or editing a lesson waits for the server, because overlapping lessons are rejected with a `409`. Queries are not retried on 4xx responses.
+Server state is handled by TanStack Query. Each entity owns its query key factory and read hooks, and the editor features own the mutations. Every write is optimistic and goes through a persisted mutation queue, see [Offline-first sync](#offline-first-sync). Queries are not retried on 4xx responses.
 
 The backend is a single Vercel Function entry (`api/[...slug].ts`) that delegates to `server/`: a router, session auth, input validation and one handler module per resource. Local imports in `server/` use explicit `.js` extensions because the project is an ES module.
 
@@ -60,21 +61,29 @@ With the Vercel and Neon integration enabled, every preview deployment gets its 
 
 A preview branch starts as a copy of its parent branch, so it contains the parent's data. Point the integration at a parent branch that holds only test data if the production database contains real student names.
 
-## Offline reading
-Lessons and students are cached in IndexedDB, so the last loaded data stays readable without a connection, including after a restart. Only successful lesson and student queries are stored, for at most three days, and the cache is versioned with a buster string (`CACHE_MAX_AGE_MS` and `CACHE_BUSTER` in `src/app/providers/persistence.ts`). It is wiped when the app lands on the login screen, because it contains student names.
+## Offline-first sync
+The app is usable for weeks without a connection. The device is the source of truth while offline and the server catches up later.
 
-The app is read-only while offline. There is no write queue: adding, editing and deleting are disabled and the UI says "Нет связи" until the connection returns. When data is shown from the cache because a refresh failed, a short banner warns that it may be outdated. The service worker only caches the app shell and never API responses.
+- **Local data.** Lessons and students are persisted to IndexedDB for up to 30 days (`CACHE_MAX_AGE_MS` and `CACHE_BUSTER` in `src/app/providers/persistence.ts`). On startup the app asks the browser for persistent storage so the data is not evicted under storage pressure.
+- **Mutation queue.** Creating, editing and deleting lessons and students are TanStack Query mutations that share one scope, so they run strictly one after another in the order they were made. While offline they stay paused, and the queue itself is stored in IndexedDB, so it survives restarts. Each mutation updates the cache optimistically, so the UI reacts instantly. Cached queries are not refetched while the queue is not empty, so optimistic data is never overwritten by stale server data. Once the last queued write settles, the cache is refreshed from the server.
+- **Client generated ids.** New students and lessons get a UUID on the device (`crypto.randomUUID` with a `getRandomValues` fallback for insecure contexts), so a lesson can reference a student that has not been synced yet. The API accepts the id on `POST` and is idempotent (`on conflict (id) do nothing`), which makes retries after a lost response safe. Deleting an already deleted row counts as success.
+- **Conflicts.** Overlapping lessons are rejected on the device before they enter the queue, using every lesson known locally. If the server still answers `409` (for example after an edit from another device), the change is dropped, a banner explains why and the cache is refreshed. Client errors (4xx) are never retried, so one rejected change cannot block the queue.
+- **Connectivity.** `navigator.onLine` is not trusted. The online state comes from the Capacitor Network plugin plus a heartbeat request to `/api/ping`, which also runs every 15 seconds while the app considers itself offline and whenever the app returns to the foreground. A failed request marks the app offline immediately.
+- **Retries.** Failed writes are retried with exponential backoff and random jitter, capped at 60 seconds, so many devices that reconnect at the same time do not hammer the free tier of Vercel or Neon. Network errors are retried indefinitely, server errors (5xx) up to 5 times.
+- **Sessions.** The session cookie lasts 30 days. When the API answers `401`, the app shows a login prompt over the current screen and keeps the pending requests waiting. Nothing is wiped, and the queue resumes right after signing in again.
+- **Background safety.** The cache is flushed to IndexedDB whenever the page is hidden. On native builds the flush runs inside a background task (`@capawesome/capacitor-background-task`), so the OS does not cut it short when the app is minimized.
+- **App shell.** `vite-plugin-pwa` generates a Workbox service worker that precaches every build asset, so the web version also starts without a connection. API responses are never cached by the service worker.
 
 ## Mobile app
-The phone app is a Capacitor shell that loads the deployed web app, so there is a single codebase and web changes reach the app on the next Vercel deploy without rebuilding it. Sessions use the same cookie as in the browser.
+The phone app is a Capacitor shell that bundles the production web build (`webDir: dist`), so the UI starts instantly and without a network. Only API calls go to the deployed backend, using `VITE_API_URL` as the origin. Capacitor's native HTTP and cookie plugins are enabled, so requests bypass CORS and the HttpOnly session cookie works from the `https://localhost` WebView origin.
 
-    export APP_URL=https://your-project.vercel.app
+    export VITE_API_URL=https://your-project.vercel.app
     npm install
     npm run build
     npx cap add android
     npx cap open android
 
-Build the APK from Android Studio, or without any local tooling: set the `APP_URL` repository variable, push a `v*` tag and the `Android APK` workflow attaches a debug APK to the GitHub Release (a manual run only uploads it as a run artifact). After changing `capacitor.config.ts` or plugins, run `npm run cap:sync`. iOS works the same way with `npx cap add ios` on macOS.
+Build the APK from Android Studio, or without any local tooling: set the `APP_URL` repository variable to the deployed URL, push a `v*` tag and the `Android APK` workflow attaches a debug APK to the GitHub Release (a manual run only uploads it as a run artifact). After changing `capacitor.config.ts`, plugins or web code, run `npm run cap:sync` with `VITE_API_URL` set. iOS works the same way with `npx cap add ios` on macOS. Unlike a remote-URL shell, a new web version reaches the phone only with a new app build.
 
 ## Releases
     npm run release -- "fix: handle empty note"

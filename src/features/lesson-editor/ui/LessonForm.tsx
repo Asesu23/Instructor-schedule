@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
-import type { Lesson } from '@/entities/lesson';
+import { useLessonCache, type Lesson } from '@/entities/lesson';
 import { StudentPicker, type Student } from '@/entities/student';
-import { errorMessage, toDay, toTime, useOnline } from '@/shared/lib';
+import { newId, toDay, toTime } from '@/shared/lib';
 import { DateField, FormModal, TimeField } from '@/shared/ui';
 import { useDeleteLesson, useSaveLesson } from '../model/useLessonMutations';
 
@@ -26,12 +26,10 @@ export function LessonForm({
   const [time, setTime] = useState(start ? toTime(start) : '10:00');
   const [duration, setDuration] = useState(String(lesson?.durationMin ?? 60));
   const [note, setNote] = useState(lesson?.note ?? '');
+  const [error, setError] = useState('');
   const saveLesson = useSaveLesson();
   const deleteLesson = useDeleteLesson();
-  const online = useOnline();
-  const pending = saveLesson.isPending || deleteLesson.isPending;
-  const blocked = pending || !online;
-  const error = saveLesson.error ?? deleteLesson.error;
+  const cache = useLessonCache();
 
   const save = (e: FormEvent) => {
     e.preventDefault();
@@ -41,14 +39,18 @@ export function LessonForm({
       durationMin: Number(duration),
       note,
     };
-    deleteLesson.reset();
-    saveLesson.mutate({ id: lesson?.id ?? null, body }, { onSuccess: onSaved });
+    if (cache.findOverlap(body.startAt, body.durationMin, lesson?.id)) {
+      setError('Занятие пересекается с другим');
+      return;
+    }
+    saveLesson.mutate({ id: lesson?.id ?? newId(), isNew: !lesson, body });
+    onSaved();
   };
 
   const remove = () => {
     if (!lesson) return;
-    saveLesson.reset();
-    deleteLesson.mutate(lesson.id, { onSuccess: onSaved });
+    deleteLesson.mutate(lesson.id);
+    onSaved();
   };
 
   return (
@@ -97,18 +99,17 @@ export function LessonForm({
         Заметка
         <input value={note} maxLength={500} placeholder="Заметка" onChange={(e) => setNote(e.target.value)} />
       </label>
-      {!online && <p className="error">Нет связи</p>}
-      {error && <p className="error">{errorMessage(error)}</p>}
+      {error && <p className="error">{error}</p>}
       <div className="row">
-        <button type="submit" disabled={blocked || students.length === 0 || !studentId}>
+        <button type="submit" disabled={students.length === 0 || !studentId}>
           Сохранить
         </button>
         {lesson && (
-          <button type="button" className="danger" disabled={blocked} onClick={remove}>
+          <button type="button" className="danger" onClick={remove}>
             Удалить
           </button>
         )}
-        <button type="button" disabled={pending} onClick={onClose}>
+        <button type="button" onClick={onClose}>
           Отмена
         </button>
       </div>

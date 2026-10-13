@@ -10,6 +10,7 @@ async function route(req: VercelRequest, res: VercelResponse): Promise<Result> {
   const id = pathId ?? (typeof req.query.id === 'string' ? req.query.id : undefined);
   const method = req.method ?? 'GET';
   const body = (req.body ?? {}) as Body;
+  if (resource === 'ping') return { status: 200, body: { ok: true } };
   if (resource === 'login' && method === 'POST') return login(body, res);
   if (resource === 'logout' && method === 'POST') return logout(res);
   if (!isAuthed(req)) throw new HttpError(401, 'UNAUTHENTICATED', 'Нужен вход');

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { errorMessage } from '@/shared/lib';
 import { authApi } from '../api/authApi';
 
-export function LoginForm({ onDone }: { onDone: () => void }) {
+export function LoginForm({ onDone, hint }: { onDone: () => void; hint?: string }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -19,6 +19,7 @@ export function LoginForm({ onDone }: { onDone: () => void }) {
   return (
     <form className="card login" onSubmit={submit}>
       <h1>Расписание</h1>
+      {hint && <p className="notice">{hint}</p>}
       <input
         type="password"
         value={password}

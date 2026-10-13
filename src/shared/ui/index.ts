@@ -5,3 +5,4 @@ export { StaleBanner } from './StaleBanner';
 export { FormModal } from './FormModal';
 export { DateField } from './picker/DateField';
 export { TimeField } from './picker/TimeField';
+export { SyncFailures, SyncStatus } from './SyncStatus';

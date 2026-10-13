@@ -1,7 +1,7 @@
 import type { VercelRequest } from '@vercel/node';
 import { sql } from '../db.js';
 import { HttpError, pgCode, type Body, type Result } from '../http.js';
-import { isUuid, parseText, requireId } from '../validation.js';
+import { isUuid, parseOptionalId, parseText, requireId } from '../validation.js';
 
 const parseLesson = (body: Body) => {
   const studentId = isUuid(body.studentId) ? body.studentId : null;
@@ -57,12 +57,15 @@ export async function handleLessons(
   }
   if (!rawId && method === 'POST') {
     const lesson = parseLesson(body);
+    const id = parseOptionalId(body.id);
     try {
       const rows = await sql`
-        insert into lessons (student_id, start_at, duration_min, note)
-        values (${lesson.studentId}, ${lesson.startAt}::timestamp, ${lesson.durationMin}, ${lesson.note})
+        insert into lessons (id, student_id, start_at, duration_min, note)
+        values (coalesce(${id}::uuid, gen_random_uuid()), ${lesson.studentId}, ${lesson.startAt}::timestamp,
+          ${lesson.durationMin}, ${lesson.note})
+        on conflict (id) do nothing
         returning id`;
-      return { status: 201, body: await lessonById(rows[0].id) };
+      return { status: 201, body: await lessonById(String(rows[0]?.id ?? id)) };
     } catch (error) {
       return lessonError(error);
     }
