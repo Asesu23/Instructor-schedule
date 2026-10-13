@@ -3,6 +3,8 @@ import { api, ApiError, type Lesson, type Student } from './api';
 import { shiftDay, toDay, toTime } from './dates';
 import { DateField, TimeField } from './pickers';
 
+const endOf = (l: Lesson) => new Date(l.startAt).getTime() + l.durationMin * 60000;
+
 const message = (e: unknown) => (e instanceof ApiError ? e.message : 'Нет связи с сервером');
 
 function Skeleton({ rows }: { rows: number }) {
@@ -63,11 +65,12 @@ function Login({ onDone }: { onDone: () => void }) {
 }
 
 function Main() {
-  const [view, setView] = useState<'day' | 'students'>('day');
+  const [view, setView] = useState<'day' | 'students' | 'history'>('day');
   const [day, setDay] = useState(toDay(new Date()));
   const [lessons, setLessons] = useState<{ day: string; items: Lesson[] } | null>(null);
   const [students, setStudents] = useState<Student[] | null>(null);
   const dayRef = useRef(day);
+  const [now, setNow] = useState(() => Date.now());
   const [editing, setEditing] = useState<Lesson | 'new' | null>(null);
   const [error, setError] = useState('');
 
@@ -100,6 +103,11 @@ function Main() {
   }, [day]);
 
   useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     loadStudents();
   }, [loadStudents]);
 
@@ -107,7 +115,7 @@ function Main() {
     loadLessons();
   }, [loadLessons]);
 
-  const current = lessons?.day === day ? lessons.items : null;
+  const current = lessons?.day === day ? lessons.items.filter((l) => endOf(l) > now) : null;
 
   const dayLabel = new Date(`${day}T00:00`).toLocaleDateString('ru-RU', {
     weekday: 'long',
@@ -124,6 +132,9 @@ function Main() {
           </button>
           <button className={view === 'students' ? 'on' : ''} onClick={() => setView('students')}>
             Ученики
+          </button>
+          <button className={view === 'history' ? 'on' : ''} onClick={() => setView('history')}>
+            История
           </button>
         </nav>
       </header>
@@ -165,8 +176,10 @@ function Main() {
             + Занятие
           </button>
         </section>
-      ) : (
+      ) : view === 'students' ? (
         <Students students={students} reload={loadStudents} />
+      ) : (
+        <History students={students} />
       )}
       {editing && students && (
         <LessonForm
@@ -181,6 +194,90 @@ function Main() {
         />
       )}
     </div>
+  );
+}
+
+function History({ students }: { students: Student[] | null }) {
+  const [items, setItems] = useState<Lesson[] | null>(null);
+  const [editing, setEditing] = useState<Lesson | null>(null);
+  const [error, setError] = useState('');
+
+  const load = useCallback(() => {
+    const from = new Date('2000-01-01T00:00').toISOString();
+    const to = new Date().toISOString();
+    return api<Lesson[]>(`/lessons?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+      .then((rows) => setItems(rows.filter((l) => endOf(l) <= Date.now()).reverse()))
+      .catch((e) => {
+        setError(message(e));
+        setItems((prev) => prev ?? []);
+      });
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const groups = new Map<string, Lesson[]>();
+  for (const l of items ?? []) {
+    const key = toDay(new Date(l.startAt));
+    groups.set(key, [...(groups.get(key) ?? []), l]);
+  }
+
+  return (
+    <section>
+      {error && (
+        <p className="error" onClick={() => setError('')}>
+          {error}
+        </p>
+      )}
+      {items === null ? (
+        <Skeleton rows={4} />
+      ) : items.length === 0 ? (
+        <ul className="list">
+          <li className="empty">Прошедших занятий нет</li>
+        </ul>
+      ) : (
+        [...groups].map(([key, list]) => (
+          <div key={key}>
+            <h2>
+              {new Date(`${key}T00:00`).toLocaleDateString('ru-RU', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </h2>
+            <ul className="list">
+              {list.map((l) => {
+                const start = new Date(l.startAt);
+                const end = new Date(endOf(l));
+                return (
+                  <li key={l.id} onClick={() => setEditing(l)}>
+                    <b>
+                      {toTime(start)} - {toTime(end)}
+                    </b>
+                    <span>{l.studentName}</span>
+                    {l.note && <small>{l.note}</small>}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))
+      )}
+      {editing && students && (
+        <LessonForm
+          lesson={editing}
+          day={toDay(new Date(editing.startAt))}
+          students={students}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
+    </section>
   );
 }
 
