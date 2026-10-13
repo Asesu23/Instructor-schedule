@@ -330,3 +330,43 @@ label,
     animation: none;
   }
 }
+
+.combo-list {
+  max-height: 220px;
+  margin: 4px 0 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.combo-list li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.combo-list li.active {
+  background: var(--bg);
+}
+
+.combo-list li.sel {
+  font-weight: 600;
+}
+
+.combo-list li.empty {
+  cursor: default;
+}
+
+.combo-list small,
+.combo-list .empty {
+  color: var(--muted);
+}
+
+.combo input.filled::placeholder {
+  color: var(--fg);
+}

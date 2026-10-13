@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError, type Lesson, type Student } from './api';
 import { shiftDay, toDay, toTime } from './dates';
 import { DateField, TimeField } from './pickers';
+import { StudentField } from './StudentField';
 
 const endOf = (l: Lesson) => new Date(l.startAt).getTime() + l.durationMin * 60000;
 
@@ -295,7 +296,7 @@ function LessonForm({
   onSaved: () => void;
 }) {
   const start = lesson ? new Date(lesson.startAt) : null;
-  const [studentId, setStudentId] = useState(lesson?.studentId ?? students[0]?.id ?? '');
+  const [studentId, setStudentId] = useState(lesson?.studentId ?? '');
   const [date, setDate] = useState(start ? toDay(start) : day);
   const [time, setTime] = useState(start ? toTime(start) : '10:00');
   const [duration, setDuration] = useState(String(lesson?.durationMin ?? 60));
@@ -327,16 +328,10 @@ function LessonForm({
       <form className="card" onClick={(e) => e.stopPropagation()} onSubmit={save}>
         <h2>{lesson ? 'Занятие' : 'Новое занятие'}</h2>
         {students.length === 0 && <p className="error">Сначала добавьте ученика на вкладке «Ученики»</p>}
-        <label>
-          Ученик
-          <select value={studentId} onChange={(e) => setStudentId(e.target.value)} required>
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="field">
+          <span>Ученик</span>
+          <StudentField students={students} value={studentId} onChange={setStudentId} autoFocus={!lesson} />
+        </div>
         <div className="field">
           <span>Дата</span>
           <DateField value={date} onChange={setDate} />
@@ -367,7 +362,7 @@ function LessonForm({
         </label>
         {error && <p className="error">{error}</p>}
         <div className="row">
-          <button type="submit" disabled={students.length === 0}>
+          <button type="submit" disabled={students.length === 0 || !studentId}>
             Сохранить
           </button>
           {lesson && (
