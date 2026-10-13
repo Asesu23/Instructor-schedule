@@ -15,7 +15,7 @@ const TABS: { id: View; label: string }[] = [
 
 export function AppShell() {
   const [view, setView] = useState<View>('day');
-  const { students, error, dismissError, reload } = useStudents();
+  const { students, error, dismissError } = useStudents();
 
   return (
     <div className="app">
@@ -30,7 +30,7 @@ export function AppShell() {
       </header>
       <ErrorBanner message={error} onDismiss={dismissError} />
       {view === 'day' && <SchedulePage students={students} />}
-      {view === 'students' && <StudentsPage students={students} reload={reload} />}
+      {view === 'students' && <StudentsPage students={students} />}
       {view === 'history' && <HistoryPage students={students} />}
     </div>
   );

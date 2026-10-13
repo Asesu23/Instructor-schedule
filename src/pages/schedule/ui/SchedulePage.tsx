@@ -10,7 +10,7 @@ export function SchedulePage({ students }: { students: Student[] | null }) {
   const today = toDay(new Date(now));
   const [day, setDay] = useState(today);
   const [editing, setEditing] = useState<Lesson | 'new' | null>(null);
-  const { items, error, dismissError, reload } = useDayLessons(day);
+  const { items, error, dismissError } = useDayLessons(day);
 
   const upcoming = items?.filter((l) => lessonEnd(l) > now) ?? null;
 
@@ -51,10 +51,7 @@ export function SchedulePage({ students }: { students: Student[] | null }) {
           day={day}
           students={students}
           onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            reload();
-          }}
+          onSaved={() => setEditing(null)}
         />
       )}
     </section>

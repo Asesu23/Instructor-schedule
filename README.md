@@ -11,7 +11,7 @@ A small mobile-first PWA for a single driving instructor: keep a list of student
 - Android and iOS app via a Capacitor shell around the same web app
 
 ## Stack
-React 19, Vite, TypeScript, Vercel Functions, Neon Postgres, Capacitor.
+React 19, Vite, TypeScript, TanStack Query, Vercel Functions, Neon Postgres, Capacitor.
 
 ## Architecture
 The frontend follows [Feature-Sliced Design](https://feature-sliced.design/). `@/` is an alias for `src/`, layers import only from the layers below them, and every slice exposes its public API through an `index.ts`.
@@ -20,8 +20,10 @@ The frontend follows [Feature-Sliced Design](https://feature-sliced.design/). `@
       app/        entry point, auth gate, app shell, global styles
       pages/      schedule, students, history, login
       features/   auth, lesson-editor, student-editor
-      entities/   lesson, student (types, API client, data hooks, list items)
+      entities/   lesson, student (types, API client, query keys, data hooks, list items)
       shared/     fetch client, date helpers, UI kit (modal, date and time pickers)
+
+Server state is handled by TanStack Query. Each entity owns its query key factory and read hooks, and the editor features own the mutations. Deleting a lesson is optimistic and rolls back on failure, while creating or editing a lesson waits for the server, because overlapping lessons are rejected with a `409`. Queries are not retried on 4xx responses.
 
 The backend is a single Vercel Function entry (`api/[...slug].ts`) that delegates to `server/`: a router, session auth, input validation and one handler module per resource. Local imports in `server/` use explicit `.js` extensions because the project is an ES module.
 

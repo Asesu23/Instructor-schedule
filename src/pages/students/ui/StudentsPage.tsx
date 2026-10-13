@@ -3,7 +3,7 @@ import { StudentItem, type Student } from '@/entities/student';
 import { StudentForm } from '@/features/student-editor';
 import { Skeleton } from '@/shared/ui';
 
-export function StudentsPage({ students, reload }: { students: Student[] | null; reload: () => void }) {
+export function StudentsPage({ students }: { students: Student[] | null }) {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Student | 'new' | null>(null);
   const needle = query.trim().toLowerCase();
@@ -31,10 +31,7 @@ export function StudentsPage({ students, reload }: { students: Student[] | null;
         <StudentForm
           student={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            reload();
-          }}
+          onSaved={() => setEditing(null)}
         />
       )}
     </section>

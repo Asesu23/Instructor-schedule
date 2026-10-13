@@ -7,7 +7,7 @@ import { ErrorBanner, Skeleton } from '@/shared/ui';
 
 export function HistoryPage({ students }: { students: Student[] | null }) {
   const [editing, setEditing] = useState<Lesson | null>(null);
-  const { items, error, dismissError, reload } = useLessonHistory();
+  const { items, error, dismissError } = useLessonHistory();
 
   return (
     <section>
@@ -43,10 +43,7 @@ export function HistoryPage({ students }: { students: Student[] | null }) {
           day={toDay(new Date(editing.startAt))}
           students={students}
           onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            reload();
-          }}
+          onSaved={() => setEditing(null)}
         />
       )}
     </section>

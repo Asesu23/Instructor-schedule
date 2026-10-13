@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { lessonApi, type Lesson } from '@/entities/lesson';
+import type { Lesson } from '@/entities/lesson';
 import { StudentPicker, type Student } from '@/entities/student';
-import { toDay, toTime, useFormAction } from '@/shared/lib';
+import { errorMessage, toDay, toTime } from '@/shared/lib';
 import { DateField, FormModal, TimeField } from '@/shared/ui';
+import { useDeleteLesson, useSaveLesson } from '../model/useLessonMutations';
 
 const DURATION_PRESETS = [30, 45, 60, 90, 120];
 
@@ -25,7 +26,10 @@ export function LessonForm({
   const [time, setTime] = useState(start ? toTime(start) : '10:00');
   const [duration, setDuration] = useState(String(lesson?.durationMin ?? 60));
   const [note, setNote] = useState(lesson?.note ?? '');
-  const { error, run } = useFormAction(onSaved);
+  const saveLesson = useSaveLesson();
+  const deleteLesson = useDeleteLesson();
+  const pending = saveLesson.isPending || deleteLesson.isPending;
+  const error = saveLesson.error ?? deleteLesson.error;
 
   const save = (e: FormEvent) => {
     e.preventDefault();
@@ -35,7 +39,14 @@ export function LessonForm({
       durationMin: Number(duration),
       note,
     };
-    run(() => (lesson ? lessonApi.update(lesson.id, body) : lessonApi.create(body)));
+    deleteLesson.reset();
+    saveLesson.mutate({ id: lesson?.id ?? null, body }, { onSuccess: onSaved });
+  };
+
+  const remove = () => {
+    if (!lesson) return;
+    saveLesson.reset();
+    deleteLesson.mutate(lesson.id, { onSuccess: onSaved });
   };
 
   return (
@@ -84,17 +95,17 @@ export function LessonForm({
         Заметка
         <input value={note} maxLength={500} placeholder="Заметка" onChange={(e) => setNote(e.target.value)} />
       </label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{errorMessage(error)}</p>}
       <div className="row">
-        <button type="submit" disabled={students.length === 0 || !studentId}>
+        <button type="submit" disabled={pending || students.length === 0 || !studentId}>
           Сохранить
         </button>
         {lesson && (
-          <button type="button" className="danger" onClick={() => run(() => lessonApi.remove(lesson.id))}>
+          <button type="button" className="danger" disabled={pending} onClick={remove}>
             Удалить
           </button>
         )}
-        <button type="button" onClick={onClose}>
+        <button type="button" disabled={pending} onClick={onClose}>
           Отмена
         </button>
       </div>

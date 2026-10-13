@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
-import { studentApi, type Student } from '@/entities/student';
-import { useFormAction } from '@/shared/lib';
+import type { Student } from '@/entities/student';
+import { errorMessage } from '@/shared/lib';
 import { FormModal } from '@/shared/ui';
+import { useDeleteStudent, useSaveStudent } from '../model/useStudentMutations';
 
 export function StudentForm({
   student,
@@ -14,12 +15,21 @@ export function StudentForm({
 }) {
   const [name, setName] = useState(student?.name ?? '');
   const [note, setNote] = useState(student?.note ?? '');
-  const { error, run } = useFormAction(onSaved);
+  const saveStudent = useSaveStudent();
+  const deleteStudent = useDeleteStudent();
+  const pending = saveStudent.isPending || deleteStudent.isPending;
+  const error = saveStudent.error ?? deleteStudent.error;
 
   const save = (e: FormEvent) => {
     e.preventDefault();
-    const body = { name, note };
-    run(() => (student ? studentApi.update(student.id, body) : studentApi.create(body)));
+    deleteStudent.reset();
+    saveStudent.mutate({ id: student?.id ?? null, body: { name, note } }, { onSuccess: onSaved });
+  };
+
+  const remove = () => {
+    if (!student) return;
+    saveStudent.reset();
+    deleteStudent.mutate(student.id, { onSuccess: onSaved });
   };
 
   return (
@@ -39,15 +49,17 @@ export function StudentForm({
         Заметка
         <input value={note} maxLength={500} placeholder="Заметка" onChange={(e) => setNote(e.target.value)} />
       </label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{errorMessage(error)}</p>}
       <div className="row">
-        <button type="submit">Сохранить</button>
+        <button type="submit" disabled={pending}>
+          Сохранить
+        </button>
         {student && (
-          <button type="button" className="danger" onClick={() => run(() => studentApi.remove(student.id))}>
+          <button type="button" className="danger" disabled={pending} onClick={remove}>
             Удалить
           </button>
         )}
-        <button type="button" onClick={onClose}>
+        <button type="button" disabled={pending} onClick={onClose}>
           Отмена
         </button>
       </div>
