@@ -1,0 +1,52 @@
+.quick {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.quick textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  resize: vertical;
+}
+
+.quick ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quick li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.quick li.bad {
+  color: var(--danger);
+}
+
+.quick em {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--hover);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: normal;
+}
+
+.quick small {
+  color: var(--muted);
+}
+
+.quick li.bad small {
+  color: var(--danger);
+}

@@ -4,6 +4,7 @@ import type { Student } from '@/entities/student';
 import { LessonForm } from '@/features/lesson-editor';
 import { shiftDay, toDay, useNow } from '@/shared/lib';
 import { DateField, ErrorBanner, Skeleton, StaleBanner } from '@/shared/ui';
+import { QuickEntry } from './QuickEntry';
 
 export function SchedulePage({ students }: { students: Student[] | null }) {
   const now = useNow();
@@ -33,6 +34,7 @@ export function SchedulePage({ students }: { students: Student[] | null }) {
         <button onClick={() => setDay(today)}>Сегодня</button>
       </div>
       <h2 className="day">{dayLabel}</h2>
+      {students && <QuickEntry day={day} students={students} />}
       {upcoming === null ? (
         <Skeleton rows={3} />
       ) : (
