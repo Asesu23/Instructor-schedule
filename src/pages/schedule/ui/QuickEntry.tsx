@@ -5,6 +5,7 @@ import { useSaveLesson } from '@/features/lesson-editor';
 import { useSaveStudent } from '@/features/student-editor';
 import { errorMessage, newId, toTime, useOnline } from '@/shared/lib';
 import { parseQuickEntry, type QuickLine } from '../model/parseQuickEntry';
+import { useSpeech } from '../model/useSpeech';
 import './quick-entry.css';
 
 const STORAGE_KEY = 'quick-entry-duration';
@@ -49,12 +50,16 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
   const cache = useLessonCache();
   const saveStudent = useSaveStudent();
   const saveLesson = useSaveLesson();
+  const speech = useSpeech((phrase) =>
+    setText((current) => (current.trim() ? `${current.trimEnd()}\n${phrase.trim()}` : phrase.trim())),
+  );
 
   const lines = withOverlaps(parseQuickEntry(text, day, students, duration), cache.findOverlap);
   const ready = lines.filter((l) => !l.error);
 
   const submit = async () => {
     if (busy || ready.length === 0) return;
+    speech.stop();
     setBusy(true);
     setError('');
     const created = new Map<string, string>();
@@ -95,7 +100,7 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
     <div className="quick">
       <textarea
         value={text}
-        rows={Math.min(8, Math.max(2, text.split('\n').length))}
+        rows={Math.min(8, Math.max(3, text.split('\n').length))}
         placeholder={'10 Иван\n11:30 Оля 90\n13 Петя 1.5ч, парковка'}
         aria-label="Быстрая запись"
         onChange={(e) => setText(e.target.value)}
@@ -115,7 +120,8 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
               ) : (
                 <>
                   <b>
-                    {toTime(new Date(line.startAt!))} - {toTime(new Date(new Date(line.startAt!).getTime() + line.durationMin! * 60000))}
+                    {toTime(new Date(line.startAt!))} -{' '}
+                    {toTime(new Date(new Date(line.startAt!).getTime() + line.durationMin! * 60000))}
                   </b>
                   <span>{line.name}</span>
                   {!line.student && <em>новый</em>}
@@ -126,10 +132,17 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
           ))}
         </ul>
       )}
-      {error && <p className="error">{error}</p>}
-      <button className="add" disabled={!online || busy || ready.length === 0} onClick={() => void submit()}>
-        {ready.length > 1 ? `Записать (${ready.length})` : 'Записать'}
-      </button>
+      {(error || speech.error) && <p className="error">{error || speech.error}</p>}
+      <div className="row">
+        <button className="add" disabled={!online || busy || ready.length === 0} onClick={() => void submit()}>
+          {ready.length > 1 ? `Записать (${ready.length})` : 'Записать'}
+        </button>
+        {speech.supported && (
+          <button type="button" className={speech.listening ? 'on' : ''} disabled={!online} onClick={speech.toggle}>
+            {speech.listening ? 'Стоп' : 'Голос'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

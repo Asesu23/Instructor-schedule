@@ -1,0 +1,7 @@
+header nav {
+  flex-wrap: wrap;
+}
+
+header nav button {
+  padding: 0 10px;
+}

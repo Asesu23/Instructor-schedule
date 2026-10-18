@@ -8,6 +8,7 @@ A small mobile-first PWA for a single driving instructor: keep a list of student
 - Lessons with minute-precision start and duration in minutes; overlaps are rejected by a Postgres exclusion constraint
 - Day view in the device time zone
 - Light and dark themes: the first launch follows the system setting, a header button switches it and the choice is remembered
+- Quick entry tab: type or dictate a day's lessons line by line (`10 Ivan`, `11:30 Olga 90`), with a live preview and automatic creation of new students
 - Installable PWA
 - Android and iOS app via a Capacitor shell around the same web app
 
@@ -93,4 +94,4 @@ Changes to native code, plugins or `capacitor.config.ts` are not delivered this 
 The script commits all pending changes with the given Conventional Commits message, picks the next `vX.Y.Z` tag from the latest one (patch by default, `--minor` or `--major` for bigger releases), pushes the commit and the tag, and the `Android APK` workflow publishes a GitHub Release with the APK and the web bundle for over-the-air updates. Add `--dry-run` to print the plan without changing anything.
 
 ## Notes
-Lesson times are stored in UTC. Keep student names and notes free of surnames, phone numbers and addresses.
+Lesson times are stored in UTC. Keep student names and notes free of surnames, phone numbers and addresses. Voice input uses the browser's speech recognition service, so the audio leaves the device; use typed entry if that matters.

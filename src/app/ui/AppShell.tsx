@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { useStudents } from '@/entities/student';
 import { ThemeToggle } from '@/features/theme-toggle';
 import { HistoryPage } from '@/pages/history';
-import { SchedulePage } from '@/pages/schedule';
+import { QuickEntryPage, SchedulePage } from '@/pages/schedule';
 import { StudentsPage } from '@/pages/students';
 import { useOnline } from '@/shared/lib';
 import { ErrorBanner, StaleBanner } from '@/shared/ui';
+import './appShell.css';
 
-type View = 'day' | 'students' | 'history';
+type View = 'day' | 'quick' | 'students' | 'history';
 
 const TABS: { id: View; label: string }[] = [
   { id: 'day', label: 'День' },
+  { id: 'quick', label: 'Запись' },
   { id: 'students', label: 'Ученики' },
   { id: 'history', label: 'История' },
 ];
@@ -36,6 +38,7 @@ export function AppShell() {
       <ErrorBanner message={error} onDismiss={dismissError} />
       {view === 'students' && <StaleBanner visible={stale} />}
       {view === 'day' && <SchedulePage students={students} />}
+      {view === 'quick' && <QuickEntryPage students={students} />}
       {view === 'students' && <StudentsPage students={students} />}
       {view === 'history' && <HistoryPage students={students} />}
     </div>
