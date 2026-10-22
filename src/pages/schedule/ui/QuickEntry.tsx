@@ -133,6 +133,7 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
         </ul>
       )}
       {(error || speech.error) && <p className="error">{error || speech.error}</p>}
+      {speech.listening && <small>Говорите, затем пауза</small>}
       <div className="row">
         <button className="add" disabled={!online || busy || ready.length === 0} onClick={() => void submit()}>
           {ready.length > 1 ? `Записать (${ready.length})` : 'Записать'}

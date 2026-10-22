@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 
 type RecognitionResult = { isFinal: boolean; 0?: { transcript: string } };
 type RecognitionEvent = { resultIndex: number; results: ArrayLike<RecognitionResult> };
@@ -15,9 +17,20 @@ type Recognition = {
 };
 type RecognitionCtor = new () => Recognition;
 
+const isNative = Capacitor.isNativePlatform();
+
 const getCtor = () => {
   const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+};
+
+const webMessage = (code: string) => {
+  if (code === 'not-allowed') return 'Нет доступа к микрофону';
+  if (code === 'audio-capture') return 'Микрофон не найден';
+  if (code === 'network' || code === 'service-not-allowed' || code === 'language-not-supported') {
+    return `Этот браузер не поддерживает распознавание речи (${code}), откройте сайт в Chrome`;
+  }
+  return `Не удалось распознать речь (${code})`;
 };
 
 export function useSpeech(onPhrase: (text: string) => void) {
@@ -30,11 +43,44 @@ export function useSpeech(onPhrase: (text: string) => void) {
     handler.current = onPhrase;
   });
 
-  useEffect(() => () => recognition.current?.abort(), []);
+  useEffect(
+    () => () => {
+      recognition.current?.abort();
+      if (isNative) SpeechRecognition.stop().catch(() => undefined);
+    },
+    [],
+  );
 
-  const stop = () => recognition.current?.stop();
+  const startNative = async () => {
+    setError('');
+    try {
+      const { available } = await SpeechRecognition.available();
+      if (!available) {
+        setError('На телефоне нет службы распознавания речи (нужно приложение Google)');
+        return;
+      }
+      const permission = await SpeechRecognition.requestPermissions();
+      if (permission.speechRecognition !== 'granted') {
+        setError('Нет доступа к микрофону');
+        return;
+      }
+      setListening(true);
+      const { matches } = await SpeechRecognition.start({
+        language: 'ru-RU',
+        maxResults: 1,
+        partialResults: false,
+        popup: false,
+      });
+      const text = matches?.[0];
+      if (text?.trim()) handler.current(text);
+    } catch (e) {
+      setError(`Не расслышал, повторите (${(e as { message?: string }).message ?? String(e)})`);
+    } finally {
+      setListening(false);
+    }
+  };
 
-  const start = () => {
+  const startWeb = () => {
     const Ctor = getCtor();
     if (!Ctor) return;
     const next = new Ctor();
@@ -50,7 +96,7 @@ export function useSpeech(onPhrase: (text: string) => void) {
     };
     next.onerror = (event) => {
       if (event.error === 'no-speech' || event.error === 'aborted') return;
-      setError(event.error === 'not-allowed' ? 'Нет доступа к микрофону' : 'Не удалось распознать речь');
+      setError(webMessage(event.error));
     };
     next.onend = () => setListening(false);
     recognition.current = next;
@@ -59,5 +105,25 @@ export function useSpeech(onPhrase: (text: string) => void) {
     next.start();
   };
 
-  return { supported: Boolean(getCtor()), listening, error, stop, toggle: () => (listening ? stop() : start()) };
+  const stop = () => {
+    if (isNative) {
+      SpeechRecognition.stop()
+        .catch(() => undefined)
+        .then(() => setListening(false));
+    } else {
+      recognition.current?.stop();
+    }
+  };
+
+  return {
+    supported: isNative || Boolean(getCtor()),
+    listening,
+    error,
+    stop,
+    toggle: () => {
+      if (listening) stop();
+      else if (isNative) void startNative();
+      else startWeb();
+    },
+  };
 }
