@@ -27,6 +27,12 @@ const rememberDuration = (value: number) => {
   }
 };
 
+const spokenLines = (phrase: string) =>
+  phrase
+    .split(/(?<=[.!?;])\s+|\n/)
+    .map((line) => line.replace(/,/g, ' ').replace(/[.!?;]+$/, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
 const withOverlaps = (lines: QuickLine[], known: (startAt: string, durationMin: number) => Lesson | undefined) => {
   const taken: { start: number; end: number }[] = [];
   return lines.map((line) => {
@@ -51,7 +57,7 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
   const saveStudent = useSaveStudent();
   const saveLesson = useSaveLesson();
   const speech = useSpeech((phrase) =>
-    setText((current) => (current.trim() ? `${current.trimEnd()}\n${phrase.trim()}` : phrase.trim())),
+    setText((current) => [current.trimEnd(), ...spokenLines(phrase)].filter(Boolean).join('\n')),
   );
 
   const lines = withOverlaps(parseQuickEntry(text, day, students, duration), cache.findOverlap);
@@ -133,14 +139,19 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
         </ul>
       )}
       {(error || speech.error) && <p className="error">{error || speech.error}</p>}
-      {speech.listening && <small>Говорите, затем пауза</small>}
+      {speech.status === 'recording' && <small>Говорите по одному занятию с паузой, затем нажмите «Стоп»</small>}
       <div className="row">
         <button className="add" disabled={!online || busy || ready.length === 0} onClick={() => void submit()}>
           {ready.length > 1 ? `Записать (${ready.length})` : 'Записать'}
         </button>
         {speech.supported && (
-          <button type="button" className={speech.listening ? 'on' : ''} disabled={!online} onClick={speech.toggle}>
-            {speech.listening ? 'Стоп' : 'Голос'}
+          <button
+            type="button"
+            className={speech.status === 'recording' ? 'on' : ''}
+            disabled={!online || speech.status === 'sending'}
+            onClick={speech.toggle}
+          >
+            {speech.status === 'recording' ? 'Стоп' : speech.status === 'sending' ? 'Распознаю...' : 'Голос'}
           </button>
         )}
       </div>

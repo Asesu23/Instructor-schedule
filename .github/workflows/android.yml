@@ -29,6 +29,9 @@ jobs:
       - run: npm run build
       - run: cd dist && zip -qr ../dist.zip .
       - run: npx cap add android
+      - run: |
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n</manifest>#' android/app/src/main/AndroidManifest.xml
+          grep -q RECORD_AUDIO android/app/src/main/AndroidManifest.xml
       - run: cp -r resources/android/res/. android/app/src/main/res/
       - run: npx cap sync android
       - run: |

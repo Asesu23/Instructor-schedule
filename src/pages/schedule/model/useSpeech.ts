@@ -1,129 +1,113 @@
 import { useEffect, useRef, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { SpeechRecognition } from '@capacitor-community/speech-recognition';
+import { api } from '@/shared/api';
+import { errorMessage } from '@/shared/lib';
+import { encodeWav, toBase64 } from './wav';
 
-type RecognitionResult = { isFinal: boolean; 0?: { transcript: string } };
-type RecognitionEvent = { resultIndex: number; results: ArrayLike<RecognitionResult> };
-type Recognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((event: RecognitionEvent) => void) | null;
-  onerror: ((event: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-};
-type RecognitionCtor = new () => Recognition;
+const RATE = 16000;
+const MAX_MS = 30000;
 
-const isNative = Capacitor.isNativePlatform();
+type Status = 'idle' | 'recording' | 'sending';
 
-const getCtor = () => {
-  const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
-};
+async function toWavBase64(blob: Blob) {
+  const context = new AudioContext();
+  const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+  void context.close();
+  const offline = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration * RATE)), RATE);
+  const source = offline.createBufferSource();
+  source.buffer = decoded;
+  source.connect(offline.destination);
+  source.start();
+  const rendered = await offline.startRendering();
+  return toBase64(encodeWav(rendered.getChannelData(0), RATE));
+}
 
-const webMessage = (code: string) => {
-  if (code === 'not-allowed') return 'Нет доступа к микрофону';
-  if (code === 'audio-capture') return 'Микрофон не найден';
-  if (code === 'network' || code === 'service-not-allowed' || code === 'language-not-supported') {
-    return `Этот браузер не поддерживает распознавание речи (${code}), откройте сайт в Chrome`;
-  }
-  return `Не удалось распознать речь (${code})`;
+const micMessage = (e: unknown) => {
+  const name = (e as { name?: string }).name ?? '';
+  if (name === 'NotAllowedError' || name === 'SecurityError') return 'Нет доступа к микрофону';
+  if (name === 'NotFoundError') return 'Микрофон не найден';
+  return `Не удалось включить микрофон (${name || 'ошибка'})`;
 };
 
 export function useSpeech(onPhrase: (text: string) => void) {
-  const [listening, setListening] = useState(false);
+  const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
-  const recognition = useRef<Recognition | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const stream = useRef<MediaStream | null>(null);
+  const timer = useRef<number | undefined>(undefined);
   const handler = useRef(onPhrase);
 
   useEffect(() => {
     handler.current = onPhrase;
   });
 
+  const release = () => {
+    window.clearTimeout(timer.current);
+    stream.current?.getTracks().forEach((track) => track.stop());
+    stream.current = null;
+  };
+
   useEffect(
     () => () => {
-      recognition.current?.abort();
-      if (isNative) SpeechRecognition.stop().catch(() => undefined);
+      const current = recorder.current;
+      if (current) {
+        current.onstop = null;
+        if (current.state === 'recording') current.stop();
+      }
+      release();
     },
     [],
   );
 
-  const startNative = async () => {
+  const stop = () => {
+    const current = recorder.current;
+    if (current?.state === 'recording') current.stop();
+  };
+
+  const start = async () => {
     setError('');
     try {
-      const { available } = await SpeechRecognition.available();
-      if (!available) {
-        setError('На телефоне нет службы распознавания речи (нужно приложение Google)');
-        return;
-      }
-      const permission = await SpeechRecognition.requestPermissions();
-      if (permission.speechRecognition !== 'granted') {
-        setError('Нет доступа к микрофону');
-        return;
-      }
-      setListening(true);
-      const { matches } = await SpeechRecognition.start({
-        language: 'ru-RU',
-        maxResults: 1,
-        partialResults: false,
-        popup: false,
-      });
-      const text = matches?.[0];
-      if (text?.trim()) handler.current(text);
+      const media = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.current = media;
+      const chunks: Blob[] = [];
+      const next = new MediaRecorder(media);
+      next.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+      next.onstop = async () => {
+        release();
+        setStatus('sending');
+        try {
+          const audio = await toWavBase64(new Blob(chunks, { type: next.mimeType }));
+          const { text } = await api<{ text: string }>('/transcribe', 'POST', { audio });
+          if (text.trim()) handler.current(text);
+          else setError('Не расслышал, повторите');
+        } catch (e) {
+          setError(errorMessage(e));
+        } finally {
+          setStatus('idle');
+        }
+      };
+      recorder.current = next;
+      next.start();
+      setStatus('recording');
+      timer.current = window.setTimeout(() => {
+        if (next.state === 'recording') next.stop();
+      }, MAX_MS);
     } catch (e) {
-      setError(`Не расслышал, повторите (${(e as { message?: string }).message ?? String(e)})`);
-    } finally {
-      setListening(false);
-    }
-  };
-
-  const startWeb = () => {
-    const Ctor = getCtor();
-    if (!Ctor) return;
-    const next = new Ctor();
-    next.lang = 'ru-RU';
-    next.continuous = true;
-    next.interimResults = false;
-    next.onresult = (event) => {
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        const text = result?.isFinal ? result[0]?.transcript : undefined;
-        if (text?.trim()) handler.current(text);
-      }
-    };
-    next.onerror = (event) => {
-      if (event.error === 'no-speech' || event.error === 'aborted') return;
-      setError(webMessage(event.error));
-    };
-    next.onend = () => setListening(false);
-    recognition.current = next;
-    setError('');
-    setListening(true);
-    next.start();
-  };
-
-  const stop = () => {
-    if (isNative) {
-      SpeechRecognition.stop()
-        .catch(() => undefined)
-        .then(() => setListening(false));
-    } else {
-      recognition.current?.stop();
+      release();
+      setError(micMessage(e));
+      setStatus('idle');
     }
   };
 
   return {
-    supported: isNative || Boolean(getCtor()),
-    listening,
+    supported: typeof MediaRecorder !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia),
+    status,
     error,
     stop,
     toggle: () => {
-      if (listening) stop();
-      else if (isNative) void startNative();
-      else startWeb();
+      if (status === 'recording') stop();
+      else if (status === 'idle') void start();
     },
   };
 }

@@ -94,4 +94,4 @@ Changes to native code, plugins or `capacitor.config.ts` are not delivered this 
 The script commits all pending changes with the given Conventional Commits message, picks the next `vX.Y.Z` tag from the latest one (patch by default, `--minor` or `--major` for bigger releases), pushes the commit and the tag, and the `Android APK` workflow publishes a GitHub Release with the APK and the web bundle for over-the-air updates. Add `--dry-run` to print the plan without changing anything.
 
 ## Notes
-Lesson times are stored in UTC. Keep student names and notes free of surnames, phone numbers and addresses. Voice input uses the platform's speech recognition (the browser service on the web, the Android recognizer in the app), so the audio may leave the device; use typed entry if that matters.
+Lesson times are stored in UTC. Keep student names and notes free of surnames, phone numbers and addresses. Voice input records a short clip and sends it to Cloudflare Workers AI (Whisper) for transcription, so the audio leaves the device. Set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to enable it, or use typed entry.
