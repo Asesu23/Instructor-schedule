@@ -1,3 +1,5 @@
+import { readDates } from './dates';
+
 type Kind = 'unit' | 'teen' | 'ten' | 'hundred' | 'zero';
 
 const WORDS = new Map<string, { kind: Kind; value: number }>();
@@ -151,10 +153,12 @@ const tidy = (tokens: string[]) => {
   return out.join(' ');
 };
 
-export function normalizeSpeech(text: string): string {
+export function normalizeSpeech(text: string, today: string): { dates: string[]; line: string } {
   const tokens = text.trim().split(/\s+/).filter(Boolean);
   let start = 0;
   while (start < tokens.length && VERB.test(lower(tokens[start]))) start += 1;
   const words = digitize(tokens.slice(start));
-  return rangeLine(words) ?? tidy(words);
+  const { dates, next } = readDates(words, today);
+  const rest = words.slice(next);
+  return { dates, line: rangeLine(rest) ?? tidy(rest) };
 }

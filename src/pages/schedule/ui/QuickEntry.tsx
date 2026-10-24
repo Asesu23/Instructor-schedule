@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useLessonCache, type Lesson } from '@/entities/lesson';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
+import { lessonApi, lessonKeys, useLessonCache, type Lesson } from '@/entities/lesson';
 import type { Student } from '@/entities/student';
 import { useSaveLesson } from '@/features/lesson-editor';
 import { useSaveStudent } from '@/features/student-editor';
 import { api } from '@/shared/api';
-import { errorMessage, newId, toTime, useOnline } from '@/shared/lib';
+import { errorMessage, hasPendingWrites, newId, shiftDay, toDay, toTime, useOnline } from '@/shared/lib';
 import { NEEDS_TIME, parseQuickEntry, type QuickLine } from '../model/parseQuickEntry';
 import { useSpeech } from '../model/useSpeech';
 import './quick-entry.css';
@@ -34,6 +35,9 @@ const spokenLines = (phrase: string) =>
     .map((line) => line.replace(/,/g, ' ').replace(/[.!?;]+$/, '').replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 
+const dayLabel = (value: string) =>
+  new Date(`${value}T00:00`).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'numeric' });
+
 const withOverlaps = (lines: QuickLine[], known: (startAt: string, durationMin: number) => Lesson | undefined) => {
   const taken: { start: number; end: number }[] = [];
   return lines.map((line) => {
@@ -52,18 +56,24 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
   const [text, setText] = useState('');
   const [duration, setDuration] = useState(savedDuration);
   const [picks, setPicks] = useState<Record<string, string>>({});
+  const [changing, setChanging] = useState('');
   const [busy, setBusy] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState('');
+  const client = useQueryClient();
   const online = useOnline();
   const cache = useLessonCache();
   const saveStudent = useSaveStudent();
   const saveLesson = useSaveLesson();
+  const sorted = [...students].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const today = toDay(new Date());
+
   const append = (items: string[]) => setText((current) => [current.trimEnd(), ...items].filter(Boolean).join('\n'));
 
   const understand = async (input: string) => {
     const reply = await api<{ lines: string[] }>('/understand', 'POST', {
       text: input,
+      today,
       students: students.map((s) => s.name),
     });
     return reply.lines;
@@ -81,11 +91,26 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
     }
   });
 
-  const parsed = parseQuickEntry(text, day, students, duration).map((line) => {
-    const pick = line.options ? picks[line.raw] : undefined;
-    if (!pick) return line;
-    const student = line.options?.find((s) => s.id === pick);
-    return { ...line, options: undefined, student, name: student?.name ?? line.name };
+  const parsedRaw = parseQuickEntry(text, day, students, duration);
+  const days = [...new Set(parsedRaw.flatMap((l) => (l.day ? [l.day] : [])))];
+
+  useQueries({
+    queries: days.map((d) => ({
+      queryKey: lessonKeys.day(d),
+      queryFn: () => {
+        const cached = client.getQueryData<Lesson[]>(lessonKeys.day(d));
+        if (cached && hasPendingWrites(client)) return cached;
+        return lessonApi.range(new Date(`${d}T00:00`).toISOString(), new Date(`${shiftDay(d, 1)}T00:00`).toISOString());
+      },
+    })),
+  });
+
+  const parsed = parsedRaw.map((line) => {
+    const pick = picks[line.raw];
+    if (!pick || line.error) return line;
+    if (pick === 'new') return { ...line, options: undefined, student: undefined, name: line.typed ?? line.name };
+    const student = students.find((s) => s.id === pick);
+    return student ? { ...line, options: undefined, student, name: student.name } : line;
   });
   const lines = withOverlaps(parsed, cache.findOverlap);
   const ready = lines.filter((l) => !l.error && !l.options);
@@ -141,6 +166,10 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
         rememberDuration(line.durationMin!);
         setDuration(line.durationMin!);
       }
+      const skipped = lines.filter((l) => l.error && l.day && done.has(l.raw));
+      if (skipped.length > 0) {
+        setError(`Не записано: ${skipped.map((l) => `${dayLabel(l.day!)} (${l.error})`).join(', ')}`);
+      }
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -152,16 +181,19 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
           .join('\n'),
       );
       setPicks({});
+      setChanging('');
       setBusy(false);
     }
   };
+
+  const seen = new Set<string>();
 
   return (
     <div className="quick">
       <textarea
         value={text}
         rows={Math.min(8, Math.max(3, text.split('\n').length))}
-        placeholder={'10 Иван\n11:30 Оля 90\n13 Петя 1.5ч, парковка'}
+        placeholder={'10 Иван\n11:30 Оля 90\nв понедельник и среду в 18:00 Петя 1.5ч'}
         aria-label="Быстрая запись"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
@@ -170,49 +202,74 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
       />
       {lines.length > 0 && (
         <ul>
-          {lines.map((line, i) => (
-            <li key={i} className={line.error ? 'bad' : undefined}>
-              {line.error ? (
-                <>
-                  <span>{line.raw}</span>
-                  <small>{line.error}</small>
-                </>
-              ) : (
-                <>
-                  <b>
-                    {toTime(new Date(line.startAt!))} -{' '}
-                    {toTime(new Date(new Date(line.startAt!).getTime() + line.durationMin! * 60000))}
-                  </b>
-                  <span>{line.name}</span>
-                  {line.options && <em>какой именно?</em>}
-                  {!line.student && !line.options && <em>новый</em>}
-                  {line.note && <small>{line.note}</small>}
-                  {line.options && (
-                    <div className="chips">
-                      {line.options.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          className="chip"
-                          onClick={() => setPicks((p) => ({ ...p, [line.raw]: s.id }))}
-                        >
-                          {s.name}
-                          {s.note && <small>{s.note}</small>}
-                        </button>
-                      ))}
-                      <button type="button" className="chip" onClick={() => setPicks((p) => ({ ...p, [line.raw]: 'new' }))}>
-                        + Новый
+          {lines.map((line, i) => {
+            const first = !seen.has(line.raw);
+            seen.add(line.raw);
+            const showChooser = first && !line.error && (line.options || !line.student || changing === line.raw);
+            return (
+              <li key={i} className={line.error ? 'bad' : undefined}>
+                {line.error ? (
+                  <>
+                    <span>{line.raw}</span>
+                    <small>{line.error}</small>
+                  </>
+                ) : (
+                  <>
+                    <b>
+                      {line.day !== day && <span className="when">{dayLabel(line.day!)}</span>}
+                      {toTime(new Date(line.startAt!))} -{' '}
+                      {toTime(new Date(new Date(line.startAt!).getTime() + line.durationMin! * 60000))}
+                    </b>
+                    <span>{line.name}</span>
+                    {line.options && <em>какой именно?</em>}
+                    {!line.student && !line.options && <em>новый</em>}
+                    {line.note && <small>{line.note}</small>}
+                    {first && line.student && changing !== line.raw && (
+                      <button type="button" className="chip" onClick={() => setChanging(line.raw)}>
+                        Другой
                       </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </li>
-          ))}
+                    )}
+                    {showChooser && (
+                      <div className="chips">
+                        {line.options?.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            className="chip"
+                            onClick={() => setPicks((p) => ({ ...p, [line.raw]: s.id }))}
+                          >
+                            {s.name}
+                            {s.note && <small>{s.note}</small>}
+                          </button>
+                        ))}
+                        <select
+                          className="pick"
+                          value=""
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value) setPicks((p) => ({ ...p, [line.raw]: value }));
+                            setChanging('');
+                          }}
+                        >
+                          <option value="">Другой ученик...</option>
+                          {sorted.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.note ? `${s.name} (${s.note})` : s.name}
+                            </option>
+                          ))}
+                          <option value="new">+ Новый ученик</option>
+                        </select>
+                      </div>
+                    )}
+                  </>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
       {(error || speech.error) && <p className="error">{error || speech.error}</p>}
-      {speech.status === 'recording' && <small>Говорите по одному занятию с паузой, затем нажмите «Стоп»</small>}
+      {speech.status === 'recording' && <small>Говорите, запись остановится сама после паузы</small>}
       <div className="row">
         <button className="add" disabled={!online || busy || thinking || ready.length === 0} onClick={() => void submit()}>
           {ready.length > 1 ? `Записать (${ready.length})` : 'Записать'}

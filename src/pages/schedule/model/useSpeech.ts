@@ -5,6 +5,9 @@ import { encodeWav, toBase64 } from './wav';
 
 const RATE = 16000;
 const MAX_MS = 30000;
+const SILENCE_MS = 1600;
+const NO_SPEECH_MS = 8000;
+const TICK_MS = 100;
 
 type Status = 'idle' | 'recording' | 'sending';
 
@@ -21,6 +24,43 @@ async function toWavBase64(blob: Blob) {
   return toBase64(encodeWav(rendered.getChannelData(0), RATE));
 }
 
+function watchSilence(media: MediaStream, onDone: (spoke: boolean) => void) {
+  const context = new AudioContext();
+  void context.resume();
+  const analyser = context.createAnalyser();
+  analyser.fftSize = 1024;
+  context.createMediaStreamSource(media).connect(analyser);
+  const data = new Uint8Array(analyser.fftSize);
+  let calibrating = 3;
+  let noise = 0;
+  let spoke = false;
+  let quiet = 0;
+  let elapsed = 0;
+  const timer = window.setInterval(() => {
+    analyser.getByteTimeDomainData(data);
+    let sum = 0;
+    for (const value of data) sum += ((value - 128) / 128) ** 2;
+    const level = Math.sqrt(sum / data.length);
+    elapsed += TICK_MS;
+    if (calibrating > 0) {
+      noise = Math.max(noise, Math.min(level, 0.05));
+      calibrating -= 1;
+      return;
+    }
+    if (level > Math.max(0.02, noise * 2)) {
+      spoke = true;
+      quiet = 0;
+    } else if (spoke) {
+      quiet += TICK_MS;
+    }
+    if ((spoke && quiet >= SILENCE_MS) || (!spoke && elapsed >= NO_SPEECH_MS)) onDone(spoke);
+  }, TICK_MS);
+  return () => {
+    window.clearInterval(timer);
+    void context.close();
+  };
+}
+
 const micMessage = (e: unknown) => {
   const name = (e as { name?: string }).name ?? '';
   if (name === 'NotAllowedError' || name === 'SecurityError') return 'Нет доступа к микрофону';
@@ -34,6 +74,8 @@ export function useSpeech(onPhrase: (text: string) => void) {
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  const watcher = useRef<(() => void) | null>(null);
+  const silent = useRef(false);
   const handler = useRef(onPhrase);
 
   useEffect(() => {
@@ -42,6 +84,8 @@ export function useSpeech(onPhrase: (text: string) => void) {
 
   const release = () => {
     window.clearTimeout(timer.current);
+    watcher.current?.();
+    watcher.current = null;
     stream.current?.getTracks().forEach((track) => track.stop());
     stream.current = null;
   };
@@ -65,6 +109,7 @@ export function useSpeech(onPhrase: (text: string) => void) {
 
   const start = async () => {
     setError('');
+    silent.current = false;
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.current = media;
@@ -75,6 +120,12 @@ export function useSpeech(onPhrase: (text: string) => void) {
       };
       next.onstop = async () => {
         release();
+        if (silent.current) {
+          silent.current = false;
+          setError('Голос не слышен, нажмите «Голос» и повторите');
+          setStatus('idle');
+          return;
+        }
         setStatus('sending');
         try {
           const audio = await toWavBase64(new Blob(chunks, { type: next.mimeType }));
@@ -90,6 +141,10 @@ export function useSpeech(onPhrase: (text: string) => void) {
       recorder.current = next;
       next.start();
       setStatus('recording');
+      watcher.current = watchSilence(media, (spoke) => {
+        silent.current = !spoke;
+        stop();
+      });
       timer.current = window.setTimeout(() => {
         if (next.state === 'recording') next.stop();
       }, MAX_MS);

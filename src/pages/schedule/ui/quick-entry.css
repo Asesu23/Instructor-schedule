@@ -65,3 +65,15 @@
   padding: 4px 10px;
   text-align: left;
 }
+
+.quick .pick {
+  width: auto;
+  max-width: 100%;
+  min-height: 36px;
+}
+
+.quick .when {
+  margin-right: 6px;
+  color: var(--muted);
+  font-weight: 400;
+}

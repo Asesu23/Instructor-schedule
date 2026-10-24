@@ -8,7 +8,7 @@ A small mobile-first PWA for a single driving instructor: keep a list of student
 - Lessons with minute-precision start and duration in minutes; overlaps are rejected by a Postgres exclusion constraint
 - Day view in the device time zone
 - Light and dark themes: the first launch follows the system setting, a header button switches it and the choice is remembered
-- Quick entry tab: type or dictate a day's lessons, line by line (`10 Ivan`, `11:30 Olga 90`) or as free-form phrases, with a live preview, a prompt to choose between students who share a first name, and automatic creation of new students
+- Quick entry tab: type or dictate a day's lessons, line by line (`10 Ivan`, `11:30 Olga 90`) or as free-form phrases (several days at once are fine, for example Monday, Wednesday and Friday at 18:00), with a live preview, a prompt to choose between students who share a first name, and automatic creation of new students
 - Installable PWA
 - Android and iOS app via a Capacitor shell around the same web app
 
