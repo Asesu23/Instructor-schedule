@@ -50,3 +50,18 @@
 .quick li.bad small {
   color: var(--danger);
 }
+
+.quick .chips {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick .chip {
+  display: grid;
+  gap: 2px;
+  min-height: 36px;
+  padding: 4px 10px;
+  text-align: left;
+}

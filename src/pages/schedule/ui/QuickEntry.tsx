@@ -3,8 +3,9 @@ import { useLessonCache, type Lesson } from '@/entities/lesson';
 import type { Student } from '@/entities/student';
 import { useSaveLesson } from '@/features/lesson-editor';
 import { useSaveStudent } from '@/features/student-editor';
+import { api } from '@/shared/api';
 import { errorMessage, newId, toTime, useOnline } from '@/shared/lib';
-import { parseQuickEntry, type QuickLine } from '../model/parseQuickEntry';
+import { NEEDS_TIME, parseQuickEntry, type QuickLine } from '../model/parseQuickEntry';
 import { useSpeech } from '../model/useSpeech';
 import './quick-entry.css';
 
@@ -50,21 +51,73 @@ const withOverlaps = (lines: QuickLine[], known: (startAt: string, durationMin: 
 export function QuickEntry({ day, students }: { day: string; students: Student[] }) {
   const [text, setText] = useState('');
   const [duration, setDuration] = useState(savedDuration);
+  const [picks, setPicks] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const [error, setError] = useState('');
   const online = useOnline();
   const cache = useLessonCache();
   const saveStudent = useSaveStudent();
   const saveLesson = useSaveLesson();
-  const speech = useSpeech((phrase) =>
-    setText((current) => [current.trimEnd(), ...spokenLines(phrase)].filter(Boolean).join('\n')),
-  );
+  const append = (items: string[]) => setText((current) => [current.trimEnd(), ...items].filter(Boolean).join('\n'));
 
-  const lines = withOverlaps(parseQuickEntry(text, day, students, duration), cache.findOverlap);
-  const ready = lines.filter((l) => !l.error);
+  const understand = async (input: string) => {
+    const reply = await api<{ lines: string[] }>('/understand', 'POST', {
+      text: input,
+      students: students.map((s) => s.name),
+    });
+    return reply.lines;
+  };
+
+  const speech = useSpeech(async (phrase) => {
+    setThinking(true);
+    try {
+      const result = await understand(phrase);
+      append(result.length ? result : spokenLines(phrase));
+    } catch {
+      append(spokenLines(phrase));
+    } finally {
+      setThinking(false);
+    }
+  });
+
+  const parsed = parseQuickEntry(text, day, students, duration).map((line) => {
+    const pick = line.options ? picks[line.raw] : undefined;
+    if (!pick) return line;
+    const student = line.options?.find((s) => s.id === pick);
+    return { ...line, options: undefined, student, name: student?.name ?? line.name };
+  });
+  const lines = withOverlaps(parsed, cache.findOverlap);
+  const ready = lines.filter((l) => !l.error && !l.options);
+  const unclear = lines.filter((l) => l.error === NEEDS_TIME).map((l) => l.raw);
+
+  const clarify = async () => {
+    setThinking(true);
+    setError('');
+    try {
+      const result = await understand(unclear.join('\n'));
+      if (result.length === 0) {
+        setError('Не получилось разобрать. Начните строку со времени, например 10:30 Иван');
+      } else {
+        setText((current) =>
+          [
+            ...current
+              .split('\n')
+              .map((l) => l.trim())
+              .filter((l) => l && !unclear.includes(l)),
+            ...result,
+          ].join('\n'),
+        );
+      }
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setThinking(false);
+    }
+  };
 
   const submit = async () => {
-    if (busy || ready.length === 0) return;
+    if (busy || thinking || ready.length === 0) return;
     speech.stop();
     setBusy(true);
     setError('');
@@ -98,6 +151,7 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
           .filter((l) => l && !done.has(l))
           .join('\n'),
       );
+      setPicks({});
       setBusy(false);
     }
   };
@@ -130,8 +184,27 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
                     {toTime(new Date(new Date(line.startAt!).getTime() + line.durationMin! * 60000))}
                   </b>
                   <span>{line.name}</span>
-                  {!line.student && <em>новый</em>}
+                  {line.options && <em>какой именно?</em>}
+                  {!line.student && !line.options && <em>новый</em>}
                   {line.note && <small>{line.note}</small>}
+                  {line.options && (
+                    <div className="chips">
+                      {line.options.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className="chip"
+                          onClick={() => setPicks((p) => ({ ...p, [line.raw]: s.id }))}
+                        >
+                          {s.name}
+                          {s.note && <small>{s.note}</small>}
+                        </button>
+                      ))}
+                      <button type="button" className="chip" onClick={() => setPicks((p) => ({ ...p, [line.raw]: 'new' }))}>
+                        + Новый
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </li>
@@ -141,17 +214,28 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
       {(error || speech.error) && <p className="error">{error || speech.error}</p>}
       {speech.status === 'recording' && <small>Говорите по одному занятию с паузой, затем нажмите «Стоп»</small>}
       <div className="row">
-        <button className="add" disabled={!online || busy || ready.length === 0} onClick={() => void submit()}>
+        <button className="add" disabled={!online || busy || thinking || ready.length === 0} onClick={() => void submit()}>
           {ready.length > 1 ? `Записать (${ready.length})` : 'Записать'}
         </button>
         {speech.supported && (
           <button
             type="button"
             className={speech.status === 'recording' ? 'on' : ''}
-            disabled={!online || speech.status === 'sending'}
+            disabled={!online || thinking || speech.status === 'sending'}
             onClick={speech.toggle}
           >
-            {speech.status === 'recording' ? 'Стоп' : speech.status === 'sending' ? 'Распознаю...' : 'Голос'}
+            {speech.status === 'recording'
+              ? 'Стоп'
+              : speech.status === 'sending'
+                ? 'Распознаю...'
+                : thinking
+                  ? 'Разбираю...'
+                  : 'Голос'}
+          </button>
+        )}
+        {unclear.length > 0 && (
+          <button type="button" disabled={!online || thinking} onClick={() => void clarify()}>
+            Разобрать
           </button>
         )}
       </div>

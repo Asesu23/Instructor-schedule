@@ -5,6 +5,7 @@ import { exportAll } from './routes/export.js';
 import { handleLessons } from './routes/lessons.js';
 import { handleStudents } from './routes/students.js';
 import { transcribe } from './routes/transcribe.js';
+import { understand } from './routes/understand.js';
 
 async function route(req: VercelRequest, res: VercelResponse): Promise<Result> {
   const [resource, pathId] = ([] as string[]).concat((req.query.slug ?? req.query['...slug'] ?? []) as string | string[]);
@@ -18,6 +19,7 @@ async function route(req: VercelRequest, res: VercelResponse): Promise<Result> {
   if (resource === 'session' && method === 'GET') return { status: 200, body: { ok: true } };
   if (resource === 'export' && method === 'GET') return exportAll();
   if (resource === 'transcribe' && method === 'POST') return transcribe(body);
+  if (resource === 'understand' && method === 'POST') return understand(body);
   if (resource === 'students') return handleStudents(method, id, body);
   if (resource === 'lessons') return handleLessons(method, id, body, req);
   throw new HttpError(404, 'NOT_FOUND', 'Не найдено');
