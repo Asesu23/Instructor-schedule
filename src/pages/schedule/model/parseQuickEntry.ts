@@ -67,20 +67,25 @@ const stem = (word: string) => {
 const sameStem = (a: string | undefined, b: string | undefined) =>
   a === b || ALIASES.some((group) => group.includes(a ?? '') && group.includes(b ?? ''));
 
-const sameName = (typed: string, known: string) => {
-  const a = typed.split(/\s+/).map(stem);
-  const b = known.split(/\s+/).map(stem);
-  return (
-    sameStem(a[0], b[0]) &&
-    a
-      .slice(1)
-      .every((word) =>
-        b
-          .slice(1)
-          .some((other) => other.startsWith(word) || (other.length === 2 && other.endsWith('.') && word.startsWith(other[0] ?? ''))),
-      )
-  );
+const words = (value: string) => value.split(/\s+/).filter(Boolean);
+
+const wordMatches = (typed: string, known: string) => {
+  if (sameStem(typed, known) || (typed.length >= 3 && known.startsWith(typed))) return 2;
+  return known.length === 2 && known.endsWith('.') && typed.startsWith(known[0] ?? '') ? 1 : 0;
 };
+
+const strength = (typed: string, known: string) => {
+  const knownStems = words(known).map(stem);
+  let level = 2;
+  for (const word of words(typed).map(stem)) {
+    const best = Math.max(0, ...knownStems.map((other) => wordMatches(word, other)));
+    if (best === 0) return 0;
+    level = Math.min(level, best);
+  }
+  return level;
+};
+
+const sortedWords = (value: string) => words(value.toLowerCase()).sort().join(' ');
 
 function parseLine(raw: string, day: string, today: string, students: Student[], fallback: number): QuickLine[] {
   const [head = '', ...rest] = raw.split(',');
@@ -105,10 +110,12 @@ function parseLine(raw: string, day: string, today: string, students: Student[],
   if (!name || /^\d+$/.test(name)) return [{ raw, error: 'Не указан ученик' }];
   if (name.length > 100) return [{ raw, error: 'Слишком длинное имя' }];
   if (durationMin < 5 || durationMin > 480) return [{ raw, error: 'Длительность от 5 до 480 минут' }];
-  const matches = students.filter((s) => sameName(name, s.name));
-  const exact = matches.find((s) => s.name.toLowerCase() === name.toLowerCase());
-  const student = exact ?? (matches.length === 1 ? matches[0] : undefined);
-  const options = !student && matches.length > 1 ? matches : undefined;
+  const strong = students.filter((s) => strength(name, s.name) === 2);
+  const weak = students.filter((s) => strength(name, s.name) === 1);
+  const exact = strong.find((s) => sortedWords(s.name) === sortedWords(name));
+  const student = exact ?? (strong.length === 1 ? strong[0] : undefined);
+  const candidates = strong.length > 0 ? strong : weak;
+  const options = !student && candidates.length > 0 ? candidates : undefined;
   const typed = titleCase(name);
   return (dates.length ? dates : [day]).map((d) => ({
     raw,
