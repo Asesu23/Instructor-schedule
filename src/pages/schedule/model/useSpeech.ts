@@ -34,6 +34,7 @@ function watchSilence(media: MediaStream, onDone: (spoke: boolean) => void) {
   let calibrating = 3;
   let noise = 0;
   let spoke = false;
+  let loud = 0;
   let quiet = 0;
   let elapsed = 0;
   const timer = window.setInterval(() => {
@@ -47,9 +48,10 @@ function watchSilence(media: MediaStream, onDone: (spoke: boolean) => void) {
       calibrating -= 1;
       return;
     }
-    if (level > Math.max(0.02, noise * 2)) {
-      spoke = true;
+    if (level > Math.max(0.02, noise * 2.5)) {
+      loud += TICK_MS;
       quiet = 0;
+      if (loud >= 300) spoke = true;
     } else if (spoke) {
       quiet += TICK_MS;
     }
@@ -76,6 +78,7 @@ export function useSpeech(onPhrase: (text: string) => void) {
   const timer = useRef<number | undefined>(undefined);
   const watcher = useRef<(() => void) | null>(null);
   const silent = useRef(false);
+  const startedAt = useRef(0);
   const handler = useRef(onPhrase);
 
   useEffect(() => {
@@ -113,6 +116,7 @@ export function useSpeech(onPhrase: (text: string) => void) {
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.current = media;
+      startedAt.current = Date.now();
       const chunks: Blob[] = [];
       const next = new MediaRecorder(media);
       next.ondataavailable = (event) => {
@@ -120,7 +124,7 @@ export function useSpeech(onPhrase: (text: string) => void) {
       };
       next.onstop = async () => {
         release();
-        if (silent.current) {
+        if (silent.current || Date.now() - startedAt.current < 1000) {
           silent.current = false;
           setError('Голос не слышен, нажмите «Голос» и повторите');
           setStatus('idle');

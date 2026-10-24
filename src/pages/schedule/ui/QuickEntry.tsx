@@ -83,7 +83,8 @@ export function QuickEntry({ day, students }: { day: string; students: Student[]
     setThinking(true);
     try {
       const result = await understand(phrase);
-      append(result.length ? result : spokenLines(phrase));
+      if (result.length) append(result);
+      else setError(`Не нашёл занятий во фразе «${phrase.trim()}». Назовите время и ученика`);
     } catch {
       append(spokenLines(phrase));
     } finally {
