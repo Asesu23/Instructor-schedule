@@ -6,6 +6,7 @@ import { QuickEntryPage, SchedulePage } from '@/pages/schedule';
 import { StudentsPage } from '@/pages/students';
 import { useOnline } from '@/shared/lib';
 import { ErrorBanner, StaleBanner } from '@/shared/ui';
+import { UpdateFooter } from './UpdateFooter';
 import './appShell.css';
 
 type View = 'day' | 'quick' | 'students' | 'history';
@@ -41,6 +42,7 @@ export function AppShell() {
       {view === 'quick' && <QuickEntryPage students={students} />}
       {view === 'students' && <StudentsPage students={students} />}
       {view === 'history' && <HistoryPage students={students} />}
+      <UpdateFooter />
     </div>
   );
 }
