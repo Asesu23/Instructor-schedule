@@ -1,7 +1,37 @@
-header nav {
-  flex-wrap: wrap;
+.app > header {
+  flex-wrap: nowrap;
+  align-items: flex-start;
 }
 
-header nav button {
-  padding: 0 10px;
+.app > header nav {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.app > header nav button {
+  flex: 1 1 auto;
+  padding: 0 clamp(6px, 2vw, 14px);
+  font-size: clamp(0.8rem, 3.6vw, 1rem);
+  white-space: nowrap;
+}
+
+.app > header .theme-toggle {
+  flex: none;
+}
+
+.daybar > button {
+  padding: 0 clamp(8px, 2.4vw, 14px);
+}
+
+.daybar .picker {
+  flex: 1;
+  min-width: 0;
+}
+
+.daybar .picker-btn {
+  overflow: hidden;
+  font-size: clamp(0.8rem, 3.8vw, 1rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -4,13 +4,15 @@ import { Pop, useDismiss } from './popover';
 
 const WEEK = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
-const formatDay = (day: string) =>
-  parseDay(day).toLocaleDateString('ru-RU', {
+const formatDay = (day: string) => {
+  const date = parseDay(day);
+  return date.toLocaleDateString('ru-RU', {
     weekday: 'short',
     day: 'numeric',
     month: 'long',
-    year: 'numeric',
+    ...(date.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' as const }),
   });
+};
 
 export function DateField({
   value,

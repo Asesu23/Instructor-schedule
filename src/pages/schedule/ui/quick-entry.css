@@ -77,3 +77,11 @@
   color: var(--muted);
   font-weight: 400;
 }
+
+.quick .row {
+  flex-wrap: wrap;
+}
+
+.quick .row button {
+  flex: 1 1 7rem;
+}
