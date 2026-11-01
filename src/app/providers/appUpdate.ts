@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { CapacitorUpdater, type BundleInfo } from '@capgo/capacitor-updater';
+import { apiUrl } from '@/shared/api';
 import { persister } from './persistence';
 
 const REPO = import.meta.env.VITE_UPDATE_REPO;
@@ -14,6 +15,8 @@ type Release = {
   assets: { name: string; browser_download_url: string }[];
 };
 
+const reason = (e: unknown) => (e as { message?: string }).message ?? String(e);
+
 const enabled = Capacitor.isNativePlatform() && Boolean(REPO) && Boolean(VERSION);
 
 let pending: BundleInfo | undefined;
@@ -25,16 +28,47 @@ export async function markUpdateReady() {
   await CapacitorUpdater.notifyAppReady().catch(() => undefined);
 }
 
+async function fetchRelease(): Promise<Release> {
+  let failure = '';
+  for (const url of [apiUrl('/update/latest'), `https://api.github.com/repos/${REPO}/releases/latest`]) {
+    try {
+      const response = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } });
+      if (response.ok) return (await response.json()) as Release;
+      failure = String(response.status);
+    } catch (e) {
+      failure = reason(e);
+    }
+  }
+  throw new Error(failure);
+}
+
+async function dropFailed(version: string) {
+  const { bundles } = await CapacitorUpdater.list();
+  await Promise.all(
+    bundles
+      .filter((bundle) => bundle.version === version && bundle.status !== 'pending')
+      .map((bundle) => CapacitorUpdater.delete({ id: bundle.id }).catch(() => undefined)),
+  );
+}
+
 async function prepareBundle(release: Release) {
   const asset = release.assets.find((item) => item.name === BUNDLE_NAME);
   if (!asset) return undefined;
   const { bundles } = await CapacitorUpdater.list();
-  const known = bundles.find((bundle) => bundle.version === release.tag_name);
-  if (known) {
-    if (known.status === 'pending') return known;
-    await CapacitorUpdater.delete({ id: known.id }).catch(() => undefined);
+  const ready = bundles.find((bundle) => bundle.version === release.tag_name && bundle.status === 'pending');
+  if (ready) return ready;
+  await dropFailed(release.tag_name).catch(() => undefined);
+  const sources = [apiUrl(`/update/bundle?tag=${encodeURIComponent(release.tag_name)}`), asset.browser_download_url];
+  const failures: string[] = [];
+  for (const url of sources) {
+    try {
+      return await CapacitorUpdater.download({ url, version: release.tag_name });
+    } catch (e) {
+      failures.push(reason(e));
+      await dropFailed(release.tag_name).catch(() => undefined);
+    }
   }
-  return CapacitorUpdater.download({ url: asset.browser_download_url, version: release.tag_name });
+  throw new Error(failures.join(' | '));
 }
 
 export async function checkForUpdate() {
@@ -42,11 +76,7 @@ export async function checkForUpdate() {
   checking = true;
   lastCheckAt = Date.now();
   try {
-    const response = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { Accept: 'application/vnd.github+json' },
-    });
-    if (!response.ok) return;
-    const release = (await response.json()) as Release;
+    const release = await fetchRelease();
     if (release.tag_name === VERSION) return;
     pending = await prepareBundle(release);
     if (pending && Date.now() - startedAt < STARTUP_APPLY_MS) await applyPendingUpdate();
@@ -71,22 +101,14 @@ export async function applyPendingUpdate() {
 
 export const appVersion = VERSION || 'dev';
 
-const reason = (e: unknown) => (e as { message?: string }).message ?? String(e);
-
 export async function checkNow(): Promise<string> {
   if (!Capacitor.isNativePlatform()) return 'Обновления работают только в приложении';
   if (!REPO || !VERSION) return 'У этой сборки нет номера версии, обновления выключены. Поставьте APK из GitHub Releases';
   let release: Release;
   try {
-    const response = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { Accept: 'application/vnd.github+json' },
-    });
-    if (response.status === 404) return 'GitHub не нашёл релиз: репозиторий приватный или релизов ещё нет';
-    if (response.status === 403) return 'GitHub временно ограничил запросы, повторите позже';
-    if (!response.ok) return `GitHub ответил ${response.status}`;
-    release = (await response.json()) as Release;
+    release = await fetchRelease();
   } catch (e) {
-    return `Нет связи с GitHub (${reason(e)})`;
+    return `Не удалось получить список релизов (${reason(e)})`;
   }
   if (release.tag_name === VERSION) return `Установлена последняя версия ${VERSION}`;
   if (!release.assets.some((item) => item.name === BUNDLE_NAME)) return `В релизе ${release.tag_name} нет файла ${BUNDLE_NAME}`;
