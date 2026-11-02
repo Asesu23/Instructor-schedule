@@ -1,97 +1,73 @@
-# Instructor Schedule
+# Limit Monitor
 
-A small mobile-first PWA for a single driving instructor: keep a list of students and schedule lessons by date and minute. Built as a personal, non-commercial project.
+A Windows desktop dashboard that tracks Claude usage-limit resets across multiple Chrome profiles, so you always know which account is ready to use.
 
 ## Features
-- Password login for one user, no registration
-- Students (first name or nickname plus a short note) with search
-- Lessons with minute-precision start and duration in minutes; overlaps are rejected by a Postgres exclusion constraint
-- Day view in the device time zone
-- Light and dark themes: the first launch follows the system setting, a header button switches it and the choice is remembered
-- Quick entry tab: type or dictate a day's lessons, line by line (`10 Ivan`, `11:30 Olga 90`) or as free-form phrases (several days at once are fine, for example Monday, Wednesday and Friday at 18:00), with a live preview, a prompt to choose between students who share a first name, and automatic creation of new students
-- Installable PWA
-- Android and iOS app via a Capacitor shell around the same web app
 
-## Stack
-React 19, Vite, TypeScript, TanStack Query, Vercel Functions, Neon Postgres, Capacitor.
+* Per-profile countdown to the next limit reset, with a clear "Ready" state.
+* Live session status for every profile: not running, starting, open, closing. A profile counts as open only while its extension reports a live claude.ai tab, and closing the last claude.ai tab or window is reported right away, so sessions you close by hand are noticed and profiles that Chrome keeps loaded in the background are never shown as open.
+* One-click launch and close of a profile session. Closing only affects the selected profile and leaves the rest of Chrome untouched.
+* Usage window timer: a second timer on every card shows how long the current usage window keeps running. It starts with the first message sent after the previous window ended, whether that is the "1" from Auto Send or a message you typed yourself, and later messages do not extend it.
+* Auto Send: a toggle in the footer that starts a new usage window for every profile that shows "Ready" and has no window running. It works one profile at a time: the extension opens the chat named "1" and sends "1" to it. Only one profile is ever launched at a time, a session that was launched automatically is closed afterwards, and a profile is handled at most once per window.
+* Shared instructions: the text of the "Instructions for Claude" setting is edited once in the dashboard and written into every Claude account through the extension, one profile at a time, with the result of each profile reported.
+* Self-updating extension: it reloads itself when its files change, so an update reaches every profile without visiting `chrome://extensions`.
+* One-click profile cloning from a template profile that already has the extension installed.
+* System tray integration with a single-instance guard.
+* Responsive dark UI: profile cards scale to fill the whole window, and a scrollbar only appears when the profiles cannot fit even at the smallest card size.
 
-## Architecture
-The frontend follows [Feature-Sliced Design](https://feature-sliced.design/). `@/` is an alias for `src/`, layers import only from the layers below them, and every slice exposes its public API through an `index.ts`.
+## How it works
 
-    src/
-      app/        entry point, auth gate, app shell, global styles
-      pages/      schedule, students, history, login
-      features/   auth, lesson-editor, student-editor, theme-toggle
-      entities/   lesson, student (types, API client, query keys, data hooks, list items)
-      shared/     fetch client, date helpers, UI kit (modal, date and time pickers)
+* **Content script** reads the limit reset time from the claude.ai page and sends a heartbeat when the page loads and then every few seconds so the dashboard knows the session is alive. Only times that appear next to a usage-limit message are considered, and every banner is evaluated once, so a stale banner can never roll the reset time over to the next day.
+* **Background service worker** forwards both to the local daemon over HTTP (this avoids CORS issues). It reports every message sent to Claude (it observes the completion requests the page makes, never their content) and the moment the last claude.ai tab or window of the profile is closed. It closes the profile's windows when the dashboard asks for it and opens a temporary tab for the ping and settings tasks. It compares a hash of its own source files every 15 seconds while a session is active and reloads itself when they change (never in the middle of a task), then re-injects the content scripts into the claude.ai tabs that are already open.
+* **Ping script** runs in that temporary tab. It finds the chat by its title, opens it, types the message, presses send, waits until the message box clears, and reports the result back. The chat title and the message are handed over by the service worker for that specific tab and are never read from the page URL, so a crafted link cannot make the extension send anything.
+* **Settings script** runs in a temporary tab as well. The claude.ai settings are a modal window opened through the URL hash, so it opens `#settings/account`, finds the instructions field by its heading, fills it, clicks the save button that only appears after an edit, reloads the page, and reports success only when the saved text matches. Like the ping task, the text is handed over by the service worker for that specific tab and is never read from the page URL.
+* **Dialog helper** (`dialogs.js`) closes unexpected modal windows, such as announcements and upsells, that would cover the page during a task. It uses the dismiss button of the modal or the Escape key, and never touches a modal that contains form controls, such as the settings window itself.
+* **Python daemon** is a small threaded HTTP server bound to `127.0.0.1`. It stores reset timestamps with atomic writes to `%LOCALAPPDATA%\Limit Monitor\state.json` (anything more than 12 hours away is discarded as noise), keeps the start of every usage window in `%LOCALAPPDATA%\Limit Monitor\usage.json` and the shared instructions text in `%LOCALAPPDATA%\Limit Monitor\settings.json`, tracks heartbeats in memory, queues tasks and hands them to the extension with the next heartbeat, and rejects requests that do not come from the extension.
+* **Auto Send** runs inside the dashboard loop. It only considers profiles in which the extension has connected at least once, picks the first one that shows "Ready" and has no usage window running, launches it (or uses it in place if it is already open), waits for the result, closes the session it launched, and pauses briefly before the next profile. A failed profile is retried once after ten minutes and then left alone for a whole window. The same runner applies the shared instructions, which takes priority over Auto Send.
+* **Tkinter dashboard** (CustomTkinter) refreshes once per second and never blocks on I/O.
 
-Server state is handled by TanStack Query. Each entity owns its query key factory and read hooks, and the editor features own the mutations. Deleting a lesson is optimistic and rolls back on failure, while creating or editing a lesson waits for the server, because overlapping lessons are rejected with a `409`. Queries are not retried on 4xx responses.
+## Requirements
 
-The backend is a single Vercel Function entry (`api/[...slug].ts`) that delegates to `server/`: a router, session auth, input validation and one handler module per resource. Local imports in `server/` use explicit `.js` extensions because the project is an ES module.
-
-## Theming
-Colors are CSS custom properties defined in `src/app/styles/index.css`. The dark palette overrides them under `:root[data-theme='dark']` and sets `color-scheme`, so native controls follow the theme too. A small inline script in `index.html` applies the saved theme, or the system one when nothing is saved, before the first paint, which avoids a flash of the wrong theme. The `theme-toggle` feature flips the `data-theme` attribute and stores the choice in `localStorage`.
+* Windows 10 or newer
+* Google Chrome
+* Python 3.10+
 
 ## Setup
-1. Create a Neon Postgres database (via the Vercel Marketplace or neon.com). The schema is applied by the migration runner, see [Database migrations](#database-migrations).
-2. Generate the password hash: `npm run hash -- "a long password"`.
-3. Set `DATABASE_URL`, `SESSION_SECRET` (random 32+ bytes) and `PASSWORD_HASH` in the Vercel project settings, see `.env.example`.
-4. Deploy the repository to Vercel. The build applies pending migrations before building the app.
 
-## Local development
-    npm install
-    cp .env.example .env
-    npm run dev
+1. Install dependencies:
 
-`npm run dev` starts `vercel dev`, which serves the web app and the API together and needs the Vercel CLI linked to a project.
+   ```
+   pip install -r requirements.txt
+   ```
 
-## Database migrations
-The schema lives in plain SQL files in `db/migrations/`, named `0001_init.sql`, `0002_*.sql` and so on. `scripts/migrate.mjs` is a small runner built on `@neondatabase/serverless`:
+2. Create a template Chrome profile, sign in to claude.ai, and load the `claude-ext` folder through `chrome://extensions` (Developer mode, Load unpacked). Set `TEMPLATE_PROFILE` in `python-core-controller.py` to that profile's directory name.
+3. Start the dashboard:
 
-- it creates a `schema_migrations` table and records the name of every applied file
-- pending files are applied in filename order, and each file runs in one transaction together with its `schema_migrations` row, so a failed migration leaves nothing half applied
-- running it again does nothing when the database is up to date
+   ```
+   python python-core-controller.py
+   ```
 
-Apply migrations manually against any database:
+New profiles created from the dashboard are cloned from the template, so the extension is already installed in them.
 
-    DATABASE_URL="postgres://..." npm run db:migrate
+Auto Send expects a chat named `1` in every Claude account. The chat title and the message are set by `PING_CHAT` and `PING_TEXT` in `python-core-controller.py`. The ping drives the claude.ai web interface, so its selectors, listed at the top of `claude-ext/ping.js`, may need an update when the site layout changes. A usage window lasts `WINDOW_SECONDS` (five hours) in `python-core-controller.py`, and a message is recognized by the request pattern `MESSAGE_ENDPOINT` at the top of `claude-ext/background.js`. The settings page is driven in the same way, so `HASHES`, `HEADING` and `SAVE_LABEL` at the top of `claude-ext/settings.js` may need an update when the layout of the claude.ai settings changes.
 
-Add a schema change as a new numbered file, never by editing a file that has already been applied. The initial migration uses `if not exists`, so it is safe to run against a database that was created from the earlier single `schema.sql`.
+Once the extension has been loaded in a profile, later updates need no manual reload: replace the files in `claude-ext` and every running profile picks them up, usually within half a minute. Profiles that are not running load the new files on their next launch.
 
-On Vercel the `vercel-build` script runs `npm run db:migrate` and then `npm run build`. The plain `build` script does not touch the database, so it can run where `DATABASE_URL` is not available, for example in the Android APK workflow.
+## Build
 
-## Preview deployments
-With the Vercel and Neon integration enabled, every preview deployment gets its own copy-on-write Neon branch. Neon creates the branch, Vercel injects its connection string as `DATABASE_URL` for that deployment, and `vercel-build` applies the migrations to it. A pull request that adds a migration is therefore tested against an isolated database and never touches production data. The `SESSION_SECRET` and `PASSWORD_HASH` variables are not provided by the integration and must be set for the Preview environment in the Vercel project settings.
+```
+pip install pyinstaller
+pyinstaller --clean --noconfirm "Limit Monitor.spec"
+```
 
-A preview branch starts as a copy of its parent branch, so it contains the parent's data. Point the integration at a parent branch that holds only test data if the production database contains real student names.
+The icon is bundled into the executable. To regenerate the application and extension icons from a single source, run `python create_icon.py`.
 
-## Offline reading
-Lessons and students are cached in IndexedDB, so the last loaded data stays readable without a connection, including after a restart. Only successful lesson and student queries are stored, for at most three days, and the cache is versioned with a buster string (`CACHE_MAX_AGE_MS` and `CACHE_BUSTER` in `src/app/providers/persistence.ts`). It is wiped when the app lands on the login screen, because it contains student names.
+## Project layout
 
-The app is read-only while offline. There is no write queue: adding, editing and deleting are disabled and the UI says "Нет связи" until the connection returns. When data is shown from the cache because a refresh failed, a short banner warns that it may be outdated. The service worker only caches the app shell and never API responses.
-
-## Mobile app
-The phone app is a Capacitor shell that bundles the built web app and talks to the deployed API through `VITE_API_URL`. Sessions use the same cookie as in the browser, handled by the native HTTP layer.
-
-    export APP_URL=https://your-project.vercel.app
-    npm install
-    npm run build
-    npx cap add android
-    npx cap open android
-
-Build the APK from Android Studio, or without any local tooling: set the `APP_URL` repository variable, push a `v*` tag and the `Android APK` workflow attaches a debug APK and the web bundle to the GitHub Release (a manual run only uploads the APK as a run artifact). After changing `capacitor.config.ts` or plugins, run `npm run cap:sync`. iOS works the same way with `npx cap add ios` on macOS.
-
-## Over-the-air updates
-The installed app updates its web bundle without reinstalling the APK. Every tagged release publishes `dist.zip` next to the APK. On launch and whenever the app returns to the foreground (at most once per 30 minutes) it asks the GitHub Releases API for the latest tag. If the tag differs from the version baked into the running bundle, the app downloads `dist.zip` with [@capgo/capacitor-updater](https://github.com/Cap-go/capacitor-updater) in manual mode and applies it the next time it is resumed, after the offline cache has been flushed to disk. A bundle that does not confirm a successful start in time is rolled back by the plugin. No third-party update service is involved.
-
-Changes to native code, plugins or `capacitor.config.ts` are not delivered this way and need a fresh APK. The service worker is registered only in the browser: inside the native shell it is removed, so it can never serve a stale app shell after an update.
-
-## Releases
-    npm run release -- "fix: handle empty note"
-    npm run release -- "feat: add lesson search" --minor
-    npm run release -- "feat!: change export format" --major
-
-The script commits all pending changes with the given Conventional Commits message, picks the next `vX.Y.Z` tag from the latest one (patch by default, `--minor` or `--major` for bigger releases), pushes the commit and the tag, and the `Android APK` workflow publishes a GitHub Release with the APK and the web bundle for over-the-air updates. Add `--dry-run` to print the plan without changing anything.
-
-## Notes
-Lesson times are stored in UTC. Keep student names and notes free of surnames, phone numbers and addresses. Voice input and free-form phrases use Cloudflare Workers AI (Whisper for speech, a language model for interpretation), so the audio and text leave the device. Set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to enable them, or use the line format.
+```
+python-core-controller.py   dashboard, tray icon and local HTTP daemon
+claude-ext/                 Manifest V3 extension (content scripts, service worker, icons)
+icon_art.py                 single source of the application icon artwork
+create_icon.py              generates icon.ico and the extension icons from icon_art.py
+Limit Monitor.spec          PyInstaller configuration
+```
